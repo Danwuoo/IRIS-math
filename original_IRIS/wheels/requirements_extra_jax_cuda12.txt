@@ -1,7 +1,0 @@
-jax[cuda12]
-flax
-optax
-orbax-checkpoint
-numpy
-ml-dtypes
-tensorstore
