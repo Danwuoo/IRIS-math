@@ -1,8 +1,8 @@
-﻿IRIS repository tree (snapshot)
+IRIS repository tree (snapshot)
 Generated: 2026-03-05
 Omitted: *.tar, /data, *.json, /package, *.whl, /wheels, /.pytest_cache, /.venv-wsl-jax, /.venv-wsl-jax2, *.pyc, /packages, *.zip
 
-.
+original_IRIS/
   artifacts/
     arc_probe/
       bootstrap_tasks/
@@ -215,7 +215,6 @@ Omitted: *.tar, /data, *.json, /package, *.whl, /wheels, /.pytest_cache, /.venv-
     10_Glossary_and_Normative_Status.md
     11_Phase_D_Diagnostics_Design_Note.md
     12_Phase_E_Execution_Design_Note.md
-    repo-tree.txt
   iris/
     __pycache__/
     __init__.py
@@ -454,7 +453,6 @@ Omitted: *.tar, /data, *.json, /package, *.whl, /wheels, /.pytest_cache, /.venv-
       data.xlsx
       LICENSE
       README.md
-  .gitignore
   AGENTS.md
   pytest.ini
   README.md
