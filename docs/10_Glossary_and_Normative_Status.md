@@ -1,8 +1,7 @@
 # Glossary and Normative Status
 
 **Document Type:** Design Note (Non-normative)  
-**Purpose:** Shared authority labels, transition terminology, and vocabulary to
-prevent control-plane drift
+**Purpose:** Shared terminology and authority labels to prevent document drift
 
 ---
 
@@ -10,124 +9,67 @@ prevent control-plane drift
 
 Use these labels consistently:
 
-- **Approved Transition Spec (Normative):** approved IRIS-math replacement or
-  superseding spec for a specific surface.
-- **Canonical Binding Workflow/Vocabulary:** binding process or metric
-  vocabulary until superseded by an approved transition spec.
-- **Active Direction (Control, Non-normative):** active project direction and
-  prioritization; does not by itself authorize conflicting implementation.
-- **Transition Proposal (Requires Approval):** candidate changes to contracts,
-  data policy, benchmark tiering, parser format, or workflow; not active until
-  approved.
-- **Historical Baseline Reference:** retained baseline IRIS contract or profile
-  document used for compatibility checks and migration analysis, not as the
-  default build target for new IRIS-math work.
-- **Design Note (Non-normative):** implementation guidance or navigation help;
-  cannot override approved specs or canonical workflow bindings.
+- **Authoritative Specification (Normative):** system-level contracts; violation is invalid architecture.
+- **Normative Contract:** binding behavioral/interface constraints.
+- **Canonical Binding (Workflow/Vocabulary):** binding policy for metrics/regression/gating vocabulary and process.
+- **Design Note (Non-normative):** implementation guidance; cannot override contracts.
+- **Change Proposal (Requires Approval):** candidate changes to contracts/policies; not active until approved.
 
-Conflict rules:
+Conflict rule:
 
-1. Approved transition specs override historical baseline references for their
-   approved surface.
-2. Canonical workflow docs remain active unless an approved transition spec
-   explicitly supersedes them.
-3. Transition proposals guide planning and proposal work but do not approve a
-   conflicting change by themselves.
-4. AGENTS, design notes, and charters cannot alone legalize conflicting
-   architecture, data, parser, or evaluation changes.
+- Normative contracts override design notes and planning notes.
 
 ---
 
-## 1.1 This Repo's Authority Map (Current)
+## 1.1 This Repo’s Authority Map (Canonical)
 
-**Active direction docs**
+**Normative (architecture contracts):**
 
-- `docs/13_IRIS_Math_v2_Charter.md`
+- `docs/01_Architecture_Constitution.md` (Authoritative Specification)
+- `docs/02_State_IR_Spec.md` (Canonical Specification)
+- `docs/03_Level_Contracts_L0-L6.md` (Normative Contract)
+- `docs/04_Credit_Assignment_and_Recovery.md` (Canonical Specification)
 
-**Transition proposals**
+**Canonical binding (process/vocabulary):**
 
-- `docs/14_IRIS_Math_Data_Constitution_v2.md`
-- `docs/15_Benchmark_Training_and_Eval_Tiering.md`
-- `docs/16_Document_Math_Parse_Canonical_Format.md`
+- `docs/05_Eval_Metrics_Spec.md` (metric vocabulary + logging schema)
+- `docs/06_Regression_and_Phase_Gates.md` (suites, phase activation, gates, artifacts, promotion criteria)
+- `docs/07_Data_Mixture_and_Ingestion.md` (stability-critical training mixture + ingestion policy)
 
-**Canonical binding workflow/vocabulary**
+**Policy-binding (engineering governance):**
 
-- `docs/05_Eval_Metrics_Spec.md`
-- `docs/06_Regression_and_Phase_Gates.md`
-- `docs/08_Training_Run_Governance.md`
+- `docs/08_Training_Run_Governance.md` (segment transactions, resume exactly-once, runtime lock, S8 drift diagnostics)
 
-**Historical baseline references**
+**Design notes:**
 
-- `docs/01_Architecture_Constitution.md`
-- `docs/02_State_IR_Spec.md`
-- `docs/03_Level_Contracts_L0-L6.md`
-- `docs/04_Credit_Assignment_and_Recovery.md`
-- `docs/07_Data_Mixture_and_Ingestion.md`
-- `docs/09_Training_Profile_SingleH100_3B.md`
-- `docs/11_Phase_D_Diagnostics_Design_Note.md`
-- `docs/12_Phase_E_Execution_Design_Note.md`
-
-**Navigation and planning**
-
-- `docs/00_INDEX.md`
-- `docs/codex_plan/Prompt.md`
-- `docs/codex_plan/Plan.md`
-- `docs/codex_plan/Documentation.md`
-- `docs/codex_plan/Implement.md` (historical baseline runbook)
-
-Current approval note:
-
-- No approved transition spec currently supersedes the historical baseline
-  architecture documents.
-- Therefore, any conflicting architecture, data, parser, or evaluation change
-  still requires proposal work and explicit approval before implementation.
+- `docs/00_INDEX.md` (navigation)
+- `docs/09_Training_Profile_SingleH100_3B.md` (single-card fixed values; non-normative profile)
+- `docs/10_Glossary_and_Normative_Status.md` (this file)
 
 ---
 
-## 2. Control-Plane Terms
-
-- **Active direction:** the current project target and prioritization. In this
-  repo, that is IRIS-math.
-- **Historical baseline:** the previous IRIS control stack preserved for
-  reference and migration analysis.
-- **Approved surface:** the portion of a proposal or spec that is explicitly
-  allowed to guide implementation right now.
-- **Blocked surface:** the portion that remains proposal-only or requires an
-  approval step before implementation.
-- **Migration artifact:** the document, decision record, decontamination note,
-  or compatibility report required to move a blocked surface toward approval.
-- **Contamination risk:** the risk that benchmark, held-out, or evaluation data
-  leaks into training or model-shaping policy.
-- **Hardware target profile:** the declared compute envelope for the current
-  task, for example `1x H100 80GB`, `1-8x H200 NVL`, `16x H200 SXM`, or
-  `1-8x B200`.
-
----
-
-## 3. Architecture and Workflow Terms
+## 2. Core Terms
 
 - **Trunk:** primary parameter-bearing cognitive substrate.
-- **Second trunk:** competing high-capacity parallel semantic network
-  (forbidden).
-- **State IR:** canonical internal representation referenced by the historical
-  baseline; any change requires explicit migration discipline.
-- **Level (L0-L6):** semantic responsibility interfaces from the historical
-  baseline architecture.
-- **Guardrail:** non-semantic safety or resource bound.
-- **Technical debt guardrail:** temporary hard control with a removal criterion.
-- **Failure taxonomy:** canonical failure categories
-  (`F_REP`, `F_PROC`, `F_SEARCH`, `F_MEM`, `F_ABS`, `F_EVAL`).
-- **Credit vector:** L6-emitted failure responsibility distribution in the
-  baseline workflow.
+- **Second trunk:** competing high-capacity parallel semantic brain (forbidden).
+- **State IR:** canonical internal representation with fixed token categories.
+- **Program IR:** procedural representation outside State IR.
+- **Level (L0-L6):** semantic responsibility interfaces in the architecture.
+- **Stub:** disabled-mode interface-preserving no-op/low-capacity adapter.
+- **Router/Gate:** learnable control signals for invocation/fusion/selection.
+- **Guardrail:** non-semantic safety/resource bound.
+- **Technical debt guardrail:** temporary hard control with removal criterion.
+- **Failure taxonomy:** canonical failure categories (`F_REP`, `F_PROC`, `F_SEARCH`, `F_MEM`, `F_ABS`, `F_EVAL`).
+- **Credit vector:** L6-emitted failure responsibility distribution.
+- **Phase A-E:** lifecycle stage used for suite activation and gate policy.
+- **S1-S8:** canonical regression suites.
 
 ---
 
-## 4. Boundary Rules
+## 3. Boundary Rules
 
-1. Direction is written once and referenced, not redefined by conflicting notes.
-2. Proposal docs must mark approved and blocked surfaces explicitly.
-3. Historical baseline references remain readable for compatibility analysis
-   even when they are no longer the default target.
-4. Workflow docs define process and vocabulary, not project identity.
-5. A missing approved transition spec is a blocker for conflicting
-   implementation, not a license to fall back silently or to improvise.
+1. Contracts are written once and referenced, not redefined by divergent wording.
+2. Metrics spec defines vocabulary, not suite activation logic.
+3. Regression/phase doc defines suite activation and gate behavior, not metric definitions.
+4. Training governance defines transaction/resume/runtime lock rules, not profile fixed values.
+5. Profile doc defines fixed run values, not global governance semantics.

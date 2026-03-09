@@ -1,170 +1,197 @@
-# Execution Plan (IRIS-math Transition / Codex)
+# Execution Plan (IRIS / Codex)
 
 **Document Type:** Design Note (Non-normative)  
-**Purpose:** Living execution plan for the IRIS-math transition  
-**Non-Override Clause:** This plan does not approve conflicting changes by
-itself. Approval still comes from approved transition specs.
+**Purpose:** Living, check-boxable execution plan for Codex runs (milestones + acceptance)  
+**Non-Override Clause:** Does not override any contracts in `docs/01..04` or bindings in `docs/05..08`.
 
 ---
 
 ## 0) Run Header (fill per Codex run)
 
 ```text
-run_id:
-date:
-change_class: pure_refactor | targeted_fix | capability_expansion | contract_migration_proposal
-active_workstream: control_plane_realignment | document_parsing_expansion | data_policy_redesign | verifier_search_upgrade | benchmark_tiering_eval_redesign | hardware_profile_routing
-active_direction_doc: docs/13_IRIS_Math_v2_Charter.md
-relevant_transition_docs:
-proposal_or_approved_status:
-impacted_baseline_docs:
-contamination_eval_risk:
-hardware_target_profile:
-termination_state:
+run_id: codex-2026-02-28-phase-c-skeleton-01
+date: 2026-02-28
+phase_target: C
+change_class: capability_expansion
+target_failure_categories: F_REP, F_PROC, F_SEARCH, F_EVAL (attribution scaffolding focus; no benchmark optimization claims)
+baseline_id (if regression-relevant): toy-baseline
+tolerance_profile_id (if regression-relevant): toy-default
 ```
 
 ---
 
-## 1) Milestones
+## 1) Milestones (recommended order)
 
-### T0 - Control-plane realignment
+### M0 — Skeleton package + CLI
 
-**Goal:** Make the active control documents point to IRIS-math instead of the
-historical baseline.
-
-**Deliverables**
-
-- `AGENTS.md` rewritten for IRIS-math transition control
-- `docs/00_INDEX.md` and `docs/10_Glossary_and_Normative_Status.md` synced to
-  the new authority map
-- `docs/13..16` seed docs created
-- `docs/codex_plan/Prompt.md`, `Plan.md`, and `Documentation.md` rewritten
-- `docs/codex_plan/Implement.md` marked as historical baseline
-
-**Acceptance**
-
-- Active control docs use consistent authority labels
-- Mandatory-reading links resolve
-- Active docs no longer present the baseline skeleton as current status
-
-### T1 - Transition proposal approval pass
-
-**Goal:** Convert the seed proposals into decision-ready transition surfaces.
+**Goal:** Create the minimal project structure so everything else has a stable home under `src/`.
 
 **Deliverables**
 
-- Approval reviews or follow-on approved specs for data, benchmark, and parser
-  surfaces
-- Explicit approved and blocked surface records for each transition area
+- `src/iris/` package created
+- `scripts/` entrypoints created (thin wrappers; logic stays in `src/iris/`)
+- A single "smoke" command that imports the package and prints versions/config
 
 **Acceptance**
 
-- Each transition area has a named approval state
-- Blocked surfaces are explicit and traceable
-
-### T2 - Data and parse groundwork
-
-**Goal:** Prepare document-native and math-native data handling under approved
-surfaces only.
-
-**Deliverables**
-
-- Canonical sidecar design work
-- Provenance and contamination reporting templates
-- Migration notes from the historical baseline data path
-
-**Acceptance**
-
-- No hidden parser bypasses remain undocumented
-- Data and parse work cites the relevant approved or proposal surface
-
-### T3 - Verifier/search upgrade
-
-**Goal:** Advance verifier-centered proof and search work without undocumented
-control drift.
-
-**Deliverables**
-
-- Verified workstream plan for verifier/search upgrades
-- Attribution, evaluation-risk, and hardware-target notes for each change
-
-**Acceptance**
-
-- Every change cites active specs and workflow docs
-- No change relies on hard-coded semantic control as routine policy
-
-### T4 - Benchmark tiering and decontamination
-
-**Goal:** Replace the single baseline benchmark posture with explicit tiers and
-held-out discipline.
-
-**Deliverables**
-
-- Tier definitions
-- Decontamination plan
-- Held-out evaluation plan
-- Regression artifact update plan
-
-**Acceptance**
-
-- Benchmark usage is classified by tier
-- Any train-time use remains blocked until approved
-
-### T5 - Hardware-scale routing
-
-**Goal:** Make scaling and training plans explicit across the available hardware
-profiles.
-
-**Deliverables**
-
-- Profile routing notes for `1x H100 80GB`, `1-8x H200 NVL`, `16x H200 SXM`,
-  and `1-8x B200`
-- Mapping from current work to the `3B -> 7B -> 14B -> 30B -> 70B -> 120B`
-  path
-
-**Acceptance**
-
-- No substantial plan assumes a single hardware profile by default
-- Every scaling-sensitive change declares its target profile
+- `python -c "import iris; print('ok')"` succeeds
 
 ---
 
-## 2) Latest Execution Status (2026-03-09)
+### M1 — State IR schema enforcement (docs/02)
+
+**Goal:** Enforce the closed token type set `{T,G,O,R,X,M}` and canonical ordering at runtime.
+
+**Deliverables**
+
+- `src/iris/schema/` implements:
+  - data structure(s) for State IR
+  - validation that rejects unknown token categories
+  - canonical concatenation ordering helper
+- Unit tests covering:
+  - ordering enforcement
+  - rejection of undefined token types
+  - empty sections are allowed (but classes must exist)
+
+**Acceptance**
+
+- `python -m pytest -q` passes for schema tests
+
+---
+
+### M2 — Level interfaces L0–L6 + stubs (docs/03)
+
+**Goal:** Ensure all Level interfaces exist and can run in stub mode with observability.
+
+**Deliverables**
+
+- `src/iris/levels/` defines:
+  - interface for each Level (`L0`..`L6`)
+  - stub implementations satisfying:
+    - `state_out = state_in` (or minimal normalization)
+    - neutral `control_out`
+    - `diagnostics` includes "disabled" marker + basic summary stats
+- Unit tests verifying stub behavior and that every Level is instantiable
+
+**Acceptance**
+
+- "structural check" script runs and prints one diagnostic record per Level
+
+---
+
+### M3 — Minimal single trunk (docs/01 + docs/02)
+
+**Goal:** Provide exactly one trunk that consumes canonical State IR and produces updates + control surfaces.
+
+**Deliverables**
+
+- `src/iris/trunk/` with a minimal model (Flax NNX preferred) that:
+  - takes State IR tokens with type embeddings
+  - outputs:
+    - updated tokens (same categories; no new token types)
+    - learnable routing/gating logits (even if unused initially)
+- A tiny forward-pass smoke test (CPU)
+
+**Acceptance**
+
+- forward pass runs on CPU with deterministic seed
+
+---
+
+### M4 — Training loop + segment journal + resume exactly-once (docs/08)
+
+**Goal:** A minimal training pipeline that is resumable and produces policy-relevant artifacts.
+
+**Deliverables**
+
+- `src/iris/train/` implements:
+  - toy dataset (synthetic, small) to validate wiring
+  - segment transaction model (execute/apply) + append-only journal (`iris.segment_journal/v1`)
+  - checkpoint save/load with the minimum required metadata fields
+- `docs/codex_plan/Implement.md` updated with exact run commands
+
+**Acceptance**
+
+- Run `N` segments, interrupt mid-segment, resume:
+  - no double-apply
+  - segment replay occurs when last event is `PENDING`
+
+---
+
+### M5 — Metrics logging + S1/S2-style checks (docs/05 + docs/06)
+
+**Goal:** Produce canonical metrics names and run fast regression-style structural checks.
+
+**Deliverables**
+
+- `src/iris/metrics/` helpers that emit:
+  - `failure.credit` vector shape and constraints
+  - Level diagnostic metrics stubs (even if zeroed)
+- A script that implements:
+  - **S1 Smoke**: no crash/NaN + basic output
+  - **S2 Structural**: Levels exist (stubs ok), State IR schema stable, no extra token types
+
+**Acceptance**
+
+- `scripts/s1_smoke.ps1` or `scripts/s1_smoke.sh` runs in < 2 minutes on CPU
+- `scripts/s2_structural.ps1` or `scripts/s2_structural.sh` passes
+
+---
+
+## 1.1) Latest Execution Status (2026-02-28)
 
 ```text
-T0 status: Done
-T1 status: Pending
-T2 status: Pending
-T3 status: Pending
-T4 status: Pending
-T5 status: Pending
-next_active_milestone: T1
+M0 status: Done
+M1 status: Done
+M2 status: Done
+M3 status: Done
+M4 status: Done
+M5 status: Done
+```
+
+Acceptance evidence:
+
+```text
+python -m pytest -q
+python scripts/s1_smoke.py --device cpu
+python scripts/s2_structural.py
+python scripts/train_toy.py --segments 2 --device cpu --output-dir artifacts/toy_train_cpu
+python scripts/eval_toy.py --output-dir artifacts/toy_train_cpu
+python scripts/train_toy.py --segments 1 --device gpu --output-dir artifacts/toy_train_gpu
+```
+
+Resume replay demonstration:
+
+```text
+python scripts/train_toy.py --segments 1 --output-dir artifacts/toy_resume --crash-point pre_commit --crash-segment 0
+python scripts/train_toy.py --segments 1 --output-dir artifacts/toy_resume
+```
+
+Expected replay result:
+
+```text
+1) First run interrupts after a PENDING journal event.
+2) Resume replays the same segment_id.
+3) Exactly one APPLIED event exists for that segment_id.
 ```
 
 ---
 
-## 3) Explicit Non-Goals for the Transition
+## 2) Explicit Non-Goals (for early runs)
 
-- Do not treat AGENTS or a design note as approval for conflicting changes.
-- Do not rebuild the baseline skeleton as the default milestone.
-- Do not assume benchmark-aware means benchmark-locked.
-- Do not assume single-H100 is the only hardware path.
+- No benchmark-specific solver logic (ARC is regression instrumentation only).
+- No hard-coded routing/termination policy (guardrails only, labeled technical debt).
+- No State IR schema changes.
 
 ---
 
-## 4) Run Closure Template
+## 3) Run Closure Template (must fill)
 
 ```text
-status: Done | Blocked | Cancelled
-change_class:
-active_workstream:
-active_specs_consulted:
-proposal_or_approved_status:
-impacted_baseline_docs:
-expected_failure_or_eval_risk_impact:
-contamination_eval_risk:
-hardware_target_profile:
-what_changed:
-validation:
-next_step:
+status: Done
+blocking_contract (if Blocked): N/A
+what_changed: Added contract-compliant baseline skeleton under src/iris (schema, levels, trunk, metrics, train), scripts, and minimal unit tests.
+expected_failure_metric_impact: Improves readiness to measure and diagnose F_REP/F_PROC/F_SEARCH/F_EVAL via canonical metrics and failure.credit instrumentation.
+technical_debt_guardrails (if any, with removal criteria): None introduced as semantic policy.
+regression_status (what ran / expected to pass): pytest pass; S1 pass; S2 pass; toy train/eval pass; crash+resume replay check pass.
 ```

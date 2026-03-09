@@ -1,304 +1,161 @@
-# AGENTS.md (for gpt-5.4)
-Project: IRIS-math
+# AGENTS.md (for gpt-5.3-codex)
+Project: IRIS (Integrated Reasoning via Internal State)
 
 ## 0) Non-Negotiable Operating Mode
-You are an implementation agent for the IRIS-math repo.
-
-This repository is transitioning from the historical baseline IRIS contract stack
-to a math-native, document-native, verifier-centered reasoning system. Optimize
-for the active IRIS-math direction while preserving explicit migration
-discipline and avoiding undocumented drift.
-
-Before any development work (code changes, refactors, new modules, eval harness,
-data-policy updates, parser changes, or control-doc rewrites), you MUST complete
-the mandatory reading steps in Section 1 and follow the permissions in Section
-3.
+You are an implementation agent. You must not introduce architectural drift.
+Before *any* development work (code changes, refactors, new modules, eval harness), you MUST complete the mandatory reading steps in Section 1 and follow the permissions in Section 3.
 
 If there is any conflict between documents:
-- Approved transition specs override historical baseline references for
-  IRIS-math work.
-- Canonical binding workflow docs apply unless an approved transition spec
-  explicitly supersedes them.
-- AGENTS.md, design notes, and project-direction statements do not by
-  themselves legalize conflicting architecture, data, or evaluation changes.
-- Change proposals are not active until approved.
+- **System-level invariants and normative contracts override everything else.**
+- "Draft" or "design notes" never override normative/authoritative contracts.
 
 When uncertain, explicitly label **不確定**.
 
-If uncertainty can be resolved by consulting the documents listed in Section 1
-or 2, you MUST resolve it before defaulting to not making the change.
+If uncertainty can be resolved by consulting binding documents listed in Section 1 or 2,
+you MUST resolve it before defaulting to not making the change.
 
-If a task depends on a conflicting change and only a proposal exists, do not
-implement the conflicting portion. Update or produce the proposal, name the
-blocked surface, and stop there.
-
-Only unresolved uncertainty after mandatory consultation should block
-implementation.
+Only unresolved uncertainty after mandatory consultation should block implementation.
 
 ---
 
 ## 1) Mandatory Reading (Always Required)
 Before you implement or modify anything, read these documents in this order:
 
-### 1.1 Always Read
-1. `AGENTS.md`
-2. `docs/00_INDEX.md`
-3. `docs/10_Glossary_and_Normative_Status.md`
+Recommended entrypoint: `docs/00_INDEX.md` (non-normative), then read the binding contracts below.
 
-### 1.2 Active IRIS-math Direction
-4. `docs/13_IRIS_Math_v2_Charter.md`
-5. `docs/14_IRIS_Math_Data_Constitution_v2.md`
-6. `docs/15_Benchmark_Training_and_Eval_Tiering.md`
-7. `docs/16_Document_Math_Parse_Canonical_Format.md`
+1. `docs/10_Glossary_and_Normative_Status.md` (Authority map + vocabulary)
+2. `docs/01_Architecture_Constitution.md` (Authoritative architecture invariants + non-goals + trunk + learnable control)
+3. `docs/02_State_IR_Spec.md` (Canonical State IR spec + examples; closed token types and ordering)
+4. `docs/03_Level_Contracts_L0-L6.md` (Level interface contracts; stub/observability/prohibitions)
+5. `docs/04_Credit_Assignment_and_Recovery.md` (Failure taxonomy + credit routing + recovery semantics)
 
-### 1.3 Current Workflow and Governance References
-Read the relevant workflow docs for the task:
-
-- `docs/05_Eval_Metrics_Spec.md` for canonical metrics vocabulary
-- `docs/06_Regression_and_Phase_Gates.md` for the currently active regression
-  workflow unless superseded by an approved transition spec
-- `docs/08_Training_Run_Governance.md` for resume, reproducibility, runtime
-  lock, and S8 topics
-
-### 1.4 Historical Baseline References
-Read the historical baseline docs only when you need compatibility checks,
-migration impact analysis, or blocked-surface traceability:
-
-- `docs/01_Architecture_Constitution.md`
-- `docs/02_State_IR_Spec.md`
-- `docs/03_Level_Contracts_L0-L6.md`
-- `docs/04_Credit_Assignment_and_Recovery.md`
-- `docs/07_Data_Mixture_and_Ingestion.md`
-- `docs/09_Training_Profile_SingleH100_3B.md`
-- `docs/11_Phase_D_Diagnostics_Design_Note.md`
-- `docs/12_Phase_E_Execution_Design_Note.md`
+These are binding. If your change would violate any item above, **do not implement**; propose an alternative that complies.
 
 ---
 
-## 2) Active Direction vs Historical Baseline
-This repository is no longer pursuing the baseline IRIS objective alone. The
-active direction is IRIS-math: a math-native, document-native,
-verifier-centered reasoning system.
+## 2) Planning/Eval Policy References (Required When Task Touches Planning/Eval Policy)
+If your task mentions or implies work on planning, evaluation policy, metrics, regression process, or phase gates, you MUST read:
 
-Treat the documents as follows:
+- `docs/05_Eval_Metrics_Spec.md` (canonical metrics vocabulary and field semantics)
+- `docs/06_Regression_and_Phase_Gates.md` (canonical suites, phase activation, gates, artifacts, promotion criteria)
+- `docs/08_Training_Run_Governance.md` (required if the task touches resume/repro/runtime lock/S8)
 
-- `docs/13..16` define the active direction and transition-control surfaces.
-- `docs/01..04`, `docs/07`, `docs/09`, `docs/11`, and `docs/12` are
-  historical baseline references, not the default build target for new
-  IRIS-math work.
-- `docs/05`, `docs/06`, and `docs/08` remain usable workflow references unless
-  an approved transition spec explicitly supersedes part of them.
-
-When baseline references conflict with the active IRIS-math direction:
-1. Consult `docs/10_Glossary_and_Normative_Status.md` for the authority map.
-2. Check whether an approved transition spec exists for the conflicting area.
-3. If an approved transition spec exists, follow it and cite the impacted
-   baseline docs.
-4. If only a proposal exists, update or create the proposal and do not
-   implement the conflicting change.
-
-Never silently force the historical baseline merely because it is older or more
-concrete.
+Notes:
+- Legacy `docs/harness/legacy/*` and `docs/plan/*` were removed during docs consolidation; do not reintroduce them.
+- Policy docs do not override Section 1 normative contracts.
 
 ---
 
 ## 3) Permissions and Authority Boundaries (Read/Write Rules)
-This section defines what you may modify. Treat it as repository policy.
+This section defines what you may modify. Treat this as a repository policy.
 
-### 3.1 Historical Baseline References (RO by Default)
-You MUST NOT edit these files as part of routine IRIS-math development:
-
+### 3.1 Read-Only (RO): Binding Contracts and Invariants
+You MUST NOT edit these files as part of routine development:
 - `docs/01_Architecture_Constitution.md`
 - `docs/02_State_IR_Spec.md`
 - `docs/03_Level_Contracts_L0-L6.md`
 - `docs/04_Credit_Assignment_and_Recovery.md`
-- `docs/07_Data_Mixture_and_Ingestion.md`
-- `docs/09_Training_Profile_SingleH100_3B.md`
-- `docs/11_Phase_D_Diagnostics_Design_Note.md`
-- `docs/12_Phase_E_Execution_Design_Note.md`
 
-If you believe a historical baseline document is wrong, incomplete, or blocks
-the IRIS-math direction, do one of the following:
-
-- Update the relevant active transition doc if the change is already approved.
-- Write or update a `Change Proposal (Requires Approval)` that explains the
-  conflict, implications, and migration path.
-- Do not silently reactivate the baseline as the controlling authority.
+If you believe a RO document is wrong or incomplete, you may:
+- Write a proposal in a *new* document (see 3.3) explaining the conflict, implications, and migration plan.
+- Do not silently change contracts.
 
 ### 3.2 Tooling Vendored Code (RO by Default)
 The following are treated as externally sourced or "vendored":
+- `tools/arc-agi-benchmarking/` (Do not modify tool internals as part of IRIS core work)
+- `tools/ConceptARC/` (Do not rewrite the dataset/tool logic for convenience)
 
-- `tools/arc-agi-benchmarking/`
-- `tools/ConceptARC/`
+Allowed: add adapters/wrappers in `src/` that consume these tools without altering their upstream semantics.
 
-Do not rewrite tool internals as a shortcut for IRIS-math core work.
-
-Allowed:
-- Add wrappers or adapters in `src/` that consume these tools without altering
-  their upstream semantics.
-
-### 3.3 Writable (W): Active Direction, Workflow, and New Notes
-You MAY edit or add under:
-
-- `docs/00_INDEX.md`
-- `docs/05_*.md`
-- `docs/06_*.md`
-- `docs/08_*.md`
-- `docs/10_*.md`
-- `docs/13_*.md` through `docs/16_*.md`
-- `docs/codex_plan/`
-- `docs/repo-tree.txt`
-
-You MAY also add new documents under `docs/` that are explicitly labeled as:
-
-- `Design Note (Non-normative)`, or
-- `Change Proposal (Requires Approval)`
-
-and that clearly state whether they are active direction, workflow guidance, or
-proposal material.
+### 3.3 Writable (W): Plans, Metrics, Regression, New Notes
+You MAY edit/add under:
+- `docs/00_INDEX.md`, `docs/05_*.md` … `docs/10_*.md`, and `docs/repo-tree.txt`, provided you do not contradict RO contracts
+- New documents under `docs/` that are explicitly labeled as:
+  - `Design Note (Non-normative)` OR
+  - `Change Proposal (Requires Approval)`
+  and that clearly state they do not override contracts.
 
 ### 3.4 Writable (W): Core Implementation
 You MAY implement and refactor core system code under:
-
-- `src/`
+- `src/` (the only place where core model behavior should live in Phase C and beyond)
 
 You MUST keep:
-
-- Core model behavior in `src/`, not in `tools/` or `data/`
-- Trunk responsibility attributable to learned model behavior
-- Any document/parser/benchmark integration aligned with approved transition
-  docs and canonical interfaces
+- State IR schema enforcement in `src/schema/` aligned with `docs/02_State_IR_Spec.md`.
+- Trunk implementation consistent with `docs/01_Architecture_Constitution.md` (no hidden second trunk, and no architecture-specific bypass that violates the contract).
 
 ---
 
 ## 4) Hard Prohibitions (Reject Changes That Do This)
 You must refuse to implement changes that:
+1. Add new State IR token categories or change canonical ordering without a versioned spec revision (not allowed in normal development).
+2. Bypass State IR by sending raw tensors, tool outputs, or program traces directly into the trunk.
+3. Replace learned routing/gating/termination with deterministic if/else policy (except explicitly labeled guardrail technical debt with removal criteria).
+4. Turn Level 2 into a "neural proposer + symbolic executor" split or a Python DSL interpreter as the core executor.
+5. Add a secondary high-capacity network that competes with the trunk ("second trunk" in disguise).
+6. Remove, collapse, or bypass any Level interface L0–L6 (including by deleting its I/O contract or stub behavior). Implementations may be disabled only if the interface contract remains intact.
 
-1. Introduce silent State IR schema drift, canonical ordering drift, or hidden
-   document-parse schema drift without a versioned approved transition spec or
-   an explicit proposal plus migration note.
-2. Bypass canonical interfaces by sending raw tensors, raw parser outputs,
-   benchmark labels, tool traces, or ad-hoc latent channels directly into the
-   trunk.
-3. Include benchmark data in training without documented tiering,
-   decontamination, held-out evaluation, and artifact plans.
-4. Replace learned routing, gating, search, or termination with deterministic
-   if/else policy, except clearly labeled temporary guardrails with removal
-   criteria.
-5. Turn verifier, search, parser, or math execution tooling into the primary
-   intelligence substrate.
-6. Add a secondary high-capacity network that competes with the trunk.
-7. Remove, collapse, or bypass Level interfaces without a documented migration
-   contract and approved replacement surface.
-8. Claim that a conflicting architecture, data, or evaluation change is allowed
-   solely because AGENTS.md or a design note says the repo targets IRIS-math.
-
-When refusing a change under this section, you MUST:
-
-- Propose the closest compliant alternative, or
-- Produce or update a minimal Change Proposal stub that identifies the blocking
-  clause, the blocked surface, and a compliant migration path.
+When refusing any change under this section, you MUST:
+- Propose the closest contract-compliant alternative, OR
+- Produce a minimal Change Proposal stub that identifies the blocking clause and a compliant migration path.
 
 Pure refusal without a next-step artifact is not allowed.
 
 ---
 
 ## 5) Required Workflow for Any Change
-### 5.1 Declare the Change Class and Workstream
-At the start of your work, explicitly declare:
+### 5.1 Declare the Change Class
+At the start of your work, explicitly declare one:
+- Pure refactor (no behavior change expected)
+- Targeted fix (must name failure category / suspected Level)
+- Capability expansion (must name concepts / expected impact)
 
-- Change class:
-  - `Pure refactor`
-  - `Targeted fix`
-  - `Capability expansion`
-  - `Contract migration proposal`
-- Active workstream:
-  - `Control-plane realignment`
-  - `Document parsing expansion`
-  - `Data-policy redesign`
-  - `Verifier/search upgrade`
-  - `Benchmark tiering/eval redesign`
-  - `Hardware profile routing`
+Use the failure taxonomy / metrics vocabulary; do not invent new labels ad hoc.
 
-Use canonical metrics vocabulary when naming expected impact. Do not invent new
-failure labels ad hoc.
+### 5.2 Maintain "Phase-Appropriate" Scope
+- Phase A: diagnostics, verifier signals, trace/logging skeleton only (no solver heuristics).
+- Phase B: tool generation alignment (failure tags, paired tasks), do not encode correctness rules into tools.
+- Phase C: minimal closed loop in `src/` with all Level interfaces present (mounted or stubbed); failures must be attributable.
+- Phase D: ConceptARC as diagnostic harness; output isolation/leakage/attribution metrics (not leaderboard tuning).
+- Phase E: arc-agi-benchmarking as regression & verifier harness; no benchmark hacks.
 
-### 5.2 Active-Spec Discipline
-Every substantial change must record:
-
-- Active spec(s) consulted
-- Proposal vs approved status for the relevant surface
-- Impacted historical baseline docs
-- Contamination or evaluation risk, if benchmarks or datasets are involved
-- Hardware target profile
-- Explicit termination state: `Done`, `Blocked`, or `Cancelled`
-
-If the task touches planning, evaluation policy, metrics, regression process,
-phase gates, benchmark inclusion, parser contracts, or data mixture, read the
-relevant active transition docs first and then cite the workflow docs they
-interact with.
+Phase definitions, suite activation states, and promotion requirements are governed by `docs/06_Regression_and_Phase_Gates.md`.
 
 ### 5.3 Regression Discipline (Always-On)
-Any architecture, training, evaluation, parser, or data-impacting change must:
+Any architectural/training/eval-impacting change must:
+- Preserve the regression harness expectations and artifacts.
+- Avoid silent shifts in failure distributions unless explicitly intended and documented.
 
-- Preserve regression expectations and required artifacts, unless an approved
-  transition spec explicitly changes them
-- Avoid silent shifts in failure distributions or evaluation semantics unless
-  the shift is intended, documented, and attributable
+All declared changes or plans MUST terminate explicitly in one of:
+- Done
+- Blocked (with blocking contract cited)
+- Cancelled (with reason)
 
 No open-ended or implicitly ongoing work is allowed.
 
 ---
 
 ## 6) "Technical Debt" Rule for Hard Control (Only as Guardrail)
-If you must introduce a hard cap (for example max steps, parser limits, or
-budget ceilings), you MUST:
-
-- Label it clearly as `TEMPORARY TECHNICAL DEBT`
-- Isolate it so it can be removed
-- Provide a removal criterion and the intended learned replacement
-- Ensure it does not become routine semantic policy
+If you must introduce a hard cap (e.g., max steps), you MUST:
+- Label it clearly as TEMPORARY TECHNICAL DEBT.
+- Isolate it so it can be removed.
+- Provide a removal criterion and the intended learned replacement.
+- Ensure it does not become routine policy.
 
 ---
 
-## 7) Hardware Routing Expectations
-Known hardware targets for this repo:
-
-- Current training resource: `1x H100 80GB`
-- Borrowable profiles: `1-8x H200 NVL`, `16x H200 SXM`, `1-8x B200`
-
-Rules:
-
-- Do not assume `1x H100` is the only valid planning target.
-- Pick the smallest hardware profile that answers the current task.
-- For scaling, training, or runtime decisions, state which profile you are
-  targeting and why.
-- If a plan is intended to scale from `3B -> 7B -> 14B -> 30B -> 70B -> 120B`,
-  say where the current change sits on that path.
-
----
-
-## 8) Repository Structure Expectations (Do Not Violate)
+## 7) Repository Structure Expectations (Do Not Violate)
 - Core model behavior belongs in `src/`.
 - Tools remain in `tools/` and should not become the intelligence substrate.
-- Datasets remain under `data/` and are not a place to encode semantics.
-- Transition control docs belong in `docs/`, not in code comments or ad-hoc
-  task notes.
+- Datasets are under `data/` and are not a place to encode semantics.
 
 ---
 
-## 9) Minimal Completion Checklist (Attach to Each PR/Change)
+## 8) Minimal Completion Checklist (Attach to Each PR/Change)
 You must include:
-
-- Which mandatory docs you consulted
-- The change class and active workstream
-- The active spec or proposal status for the touched surface
-- Impacted historical baseline docs
-- The expected failure-category or evaluation-risk impact
-- Contamination or eval-risk notes, if applicable
-- Hardware target profile
-- Any introduced technical-debt guardrails with removal criteria
-- Regression status or doc-validation status
-- Termination state: `Done`, `Blocked`, or `Cancelled`
+- Which mandatory docs you consulted (Section 1 + all relevant Section 2 policy docs).
+- The change class (refactor / targeted fix / expansion).
+- The expected failure-category impact (using canonical metrics).
+- Any introduced technical debt guardrails (with removal criteria), if applicable.
+- Regression status: what suites are expected to pass / what artifacts are updated.
 
 End of AGENTS.md

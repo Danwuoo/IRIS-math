@@ -1,14 +1,3 @@
-# Historical Baseline Runbook (Frozen)
-
-**Status:** Frozen historical baseline runbook  
-**Scope:** Archived implementation notes for the previous baseline IRIS control
-surface  
-**Do Not Use As Active Source:** For active IRIS-math work, use `AGENTS.md`,
-`docs/00_INDEX.md`, `docs/10_Glossary_and_Normative_Status.md`,
-`docs/13..16`, and the active files under `docs/codex_plan/`.
-
----
-
 # Implementation Runbook (IRIS / Codex)
 
 **Document Type:** Design Note (Non-normative)  

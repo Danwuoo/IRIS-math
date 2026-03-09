@@ -1,122 +1,110 @@
-# Codex Prompt Pack (IRIS-math Transition)
+# Codex Prompt Pack (IRIS)
 
 **Document Type:** Design Note (Non-normative)  
-**Purpose:** Stable kickoff prompt and workflow for using Codex on the active
-IRIS-math transition  
-**Non-Override Clause:** This document does not override approved transition
-specs, canonical workflow bindings, or proposal approval rules.
+**Purpose:** A stable, copy/pasteable prompt + workflow for using Codex to build IRIS without architectural drift  
+**Non-Override Clause:** This document does not override normative contracts in `docs/01..04` or workflow bindings in `docs/05..08`.
 
 ---
 
-## 0) Intended Workflow
+## 0) Intended Workflow (4-file loop)
 
-Use this active planning bundle:
+Keep these four files as the canonical "long-horizon task bundle":
 
-- `docs/codex_plan/Prompt.md` (this file): kickoff prompt and workflow guardrails
-- `docs/codex_plan/Plan.md`: living transition milestones and acceptance
-- `docs/codex_plan/Documentation.md`: decisions, assumptions (`不確定`), and
-  completion checklists
+- `docs/codex_plan/Prompt.md` (this file): the spec + kickoff prompt you paste into Codex
+- `docs/codex_plan/Plan.md`: the living execution plan (milestones, acceptance, next actions)
+- `docs/codex_plan/Implement.md`: runbook (commands, environment notes, how to validate)
+- `docs/codex_plan/Documentation.md`: decisions, assumptions (不確定), and completion checklists
 
-Historical baseline runbook:
+This follows the OpenAI Cookbook "long horizon tasks" pattern:
 
-- `docs/codex_plan/Implement.md`
-
-Do not treat `Implement.md` as the active source of truth for IRIS-math work
-unless the task explicitly targets historical baseline compatibility.
+- `https://developers.openai.com/cookbook/articles/codex_exec_plans`
 
 ---
 
 ## 1) Kickoff Prompt (copy/paste into Codex)
 
 ```text
-You are an implementation agent for the IRIS-math repo. Follow AGENTS.md exactly.
+You are an implementation agent for the IRIS repo. Follow AGENTS.md exactly.
 
-Mandatory reading BEFORE changing code or docs (in order):
-- AGENTS.md
-- docs/00_INDEX.md
+Mandatory reading BEFORE changing code (in order):
 - docs/10_Glossary_and_Normative_Status.md
-- docs/13_IRIS_Math_v2_Charter.md
-- docs/14_IRIS_Math_Data_Constitution_v2.md
-- docs/15_Benchmark_Training_and_Eval_Tiering.md
-- docs/16_Document_Math_Parse_Canonical_Format.md
+- docs/01_Architecture_Constitution.md
+- docs/02_State_IR_Spec.md
+- docs/03_Level_Contracts_L0-L6.md
+- docs/04_Credit_Assignment_and_Recovery.md
 
-Then read the relevant workflow docs:
+If the task touches metrics/regression/training ops/data mixture, also read:
 - docs/05_Eval_Metrics_Spec.md
 - docs/06_Regression_and_Phase_Gates.md
+- docs/07_Data_Mixture_and_Ingestion.md
 - docs/08_Training_Run_Governance.md
+- docs/09_Training_Profile_SingleH100_3B.md
 
-Read docs/01..04, docs/07, docs/09, docs/11, and docs/12 only when you need
-historical baseline compatibility analysis or migration traceability.
-
-Before implementation, declare:
-- change_class = pure_refactor | targeted_fix | capability_expansion | contract_migration_proposal
-- active_workstream = control_plane_realignment | document_parsing_expansion | data_policy_redesign | verifier_search_upgrade | benchmark_tiering_eval_redesign | hardware_profile_routing
-
-Core rule:
-- AGENTS.md, this prompt pack, and design notes do not by themselves approve
-  conflicting architecture, data, parser, or evaluation changes.
-- If the task depends on a conflicting surface and only a proposal exists,
-  update or create the proposal and stop short of the conflicting implementation.
+Change class: capability expansion (model-dev system scaffolding; no contract changes).
 
 Goal:
-Advance IRIS-math as a math-native, document-native, verifier-centered reasoning
-system with explicit migration discipline.
+Build an IRIS "model development system + baseline model" skeleton that is contract-compliant and can run end-to-end on a toy workload, with clear hooks for scaling to 1x H100.
 
-Non-negotiable constraints:
-- No undocumented drift in architecture, data policy, benchmark policy, or parse format.
-- No raw parser outputs, benchmark labels, or tool traces bypassing canonical interfaces into the trunk.
-- No benchmark training inclusion without tiering, decontamination, and held-out evaluation planning.
-- No hard-coded semantic routing/search/termination as routine policy.
-- No tools, datasets, or parsers becoming the primary intelligence substrate.
+Non-negotiable constraints (treat as hard requirements):
+- One and only one trunk (no second trunk / dual-brain).
+- Canonical State IR only: token types {T,G,O,R,X,M} in fixed order; no new categories.
+- All Level interfaces L0–L6 must exist; disabled levels must be stubs preserving I/O + observability.
+- Routing/gating/control must be learnable-by-default; hard control only as TEMPORARY TECHNICAL DEBT guardrails with removal criteria.
+- Do not turn L2 into a symbolic executor/DSL core.
+- Benchmarks are regression probes only (no ARC-family data in training mixture).
+
+Deliverables (Phase A→C baseline skeleton):
+- src/iris/schema/: State IR data structures + validator aligned to docs/02.
+- src/iris/levels/: L0..L6 interfaces + stubs + minimum diagnostics fields.
+- src/iris/trunk/: a minimal trunk (Flax NNX preferred) that consumes State IR and emits updates + control logits.
+- src/iris/metrics/: logging helpers using canonical metric names from docs/05.
+- src/iris/train/: minimal training loop with segment journal + exactly-once resume semantics (docs/08) on a tiny synthetic dataset.
+- scripts/: entrypoints for smoke train/eval and S1/S2-style structural checks.
+
+Validation:
+- Provide commands to run a fast smoke test on CPU and (if available) GPU.
+- Add minimal unit tests for State IR ordering/type enforcement and Level stub behavior.
 
 Working style:
-- Use docs/codex_plan/Plan.md as the transition milestone source of truth.
-- Record decisions, assumptions, and blocked surfaces in docs/codex_plan/Documentation.md.
-- Treat docs/codex_plan/Implement.md as a frozen historical baseline runbook unless the task explicitly targets that baseline.
-- Keep patches small and validate links, authority labels, and active-vs-historical wording after edits.
+- Use docs/codex_plan/Plan.md as the single source of truth for milestones + acceptance criteria.
+- Record decisions/assumptions (label 不確定 when needed) in docs/codex_plan/Documentation.md.
+- Keep patches small; run the narrowest tests first.
+- Do not edit normative RO docs; if you must, write a Change Proposal document instead.
 ```
 
 ---
 
-## 2) Hardware Profiles
+## 2) Hardware Profiles (how to phrase constraints to Codex)
 
-Codex should choose and state an explicit hardware target for each substantial
-task.
+Codex works best if you **explicitly choose one** profile per run:
 
-Known profiles:
+- **Local RTX 3050 (dev/smoke):** run small configs, prioritize `S1/S2` + unit tests; if using JAX GPU, prefer Linux/WSL2.
+- **Notebook H100 (scale target):** align to `docs/09_Training_Profile_SingleH100_3B.md`; enforce `docs/08` segment journal + resume exactly-once.
 
-- Local dev/smoke profile
-- `1x H100 80GB` current training resource
-- `1-8x H200 NVL` borrowable scale profile
-- `16x H200 SXM` borrowable scale profile
-- `1-8x B200` borrowable scale profile
-
-Rules:
-
-- Do not assume `1x H100` is the only long-range target.
-- Pick the smallest profile that answers the current task.
-- If the task is on the `3B -> 7B -> 14B -> 30B -> 70B -> 120B` path, say which
-  segment it belongs to.
+If you want both, tell Codex:
+1) implement a tiny CPU/GPU smoke config first, then  
+2) add an H100 profile only after the smoke path is stable.
 
 ---
 
-## 3) Data and Benchmark Reminder
+## 3) Dataset Policy Reminder (so prompts don’t accidentally violate docs)
 
-- Benchmark data is not automatically approved for training just because the
-  project is benchmark-aware.
-- If a task needs benchmark training inclusion, decontamination changes, or
-  held-out policy changes, work through
-  `docs/15_Benchmark_Training_and_Eval_Tiering.md` first.
-- If a task needs new parser-derived model-facing interfaces, work through
-  `docs/16_Document_Math_Parse_Canonical_Format.md` first.
-- If a task needs new mixture or ingestion policy, work through
-  `docs/14_IRIS_Math_Data_Constitution_v2.md` first.
+When you instruct Codex to "use HuggingFace datasets":
+
+- Use HF for **Pure LM** text and **IR-aligned synthetic** data pipelines.
+- Do **not** include ARC-family / ConceptARC / arc-agi-benchmarking datasets in training mixture (regression probes only).
+- Make dataset choice/config **data-driven** (config file), not hard-coded.
+
+Source of truth: `docs/07_Data_Mixture_and_Ingestion.md`.
 
 ---
 
-## 4) Prompting Tips
+## 4) Prompting Tips (Codex-specific)
 
-- Keep the goal statement short and put durable policy in docs.
-- Always include: exact task, active workstream, target hardware profile, and
-  what counts as `Done`.
-- Prefer milestones and proposal closures over open-ended "explore more" tasks.
+- Keep the goal statement short; put details in files (Plan/Implement/Documentation).
+- Always include: exact commands to run + what "done" means.
+- Ask for incremental milestones (e.g., "make S2 pass") rather than "build everything".
+
+References:
+
+- `https://developers.openai.com/cookbook/guides/gpt-5-codex_prompting_guide`
