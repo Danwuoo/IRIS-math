@@ -1,98 +1,122 @@
-# IRIS Documentation Index
+# IRIS-math Documentation Index
 
 **Document Type:** Design Note (Non-normative)  
-**Purpose:** Single entrypoint for the consolidated 10-12 document set  
-**Non-Override Clause:** This index does not override authoritative contracts.
+**Purpose:** Single entrypoint for the active IRIS-math transition control set,
+workflow docs, and historical baseline references  
+**Non-Override Clause:** This index does not override approved transition specs,
+canonical workflow bindings, or approved proposals.
 
 ---
 
-## 1. Consolidated Main Set (11 Docs)
+## 1. Active Transition Control Set
+
+These docs define the current project direction and transition surfaces:
 
 1. `docs/00_INDEX.md`
-2. `docs/01_Architecture_Constitution.md`
-3. `docs/02_State_IR_Spec.md`
-4. `docs/03_Level_Contracts_L0-L6.md`
-5. `docs/04_Credit_Assignment_and_Recovery.md`
-6. `docs/05_Eval_Metrics_Spec.md`
-7. `docs/06_Regression_and_Phase_Gates.md`
-8. `docs/07_Data_Mixture_and_Ingestion.md`
-9. `docs/08_Training_Run_Governance.md`
-10. `docs/09_Training_Profile_SingleH100_3B.md`
-11. `docs/10_Glossary_and_Normative_Status.md`
+2. `docs/10_Glossary_and_Normative_Status.md`
+3. `docs/13_IRIS_Math_v2_Charter.md`
+4. `docs/14_IRIS_Math_Data_Constitution_v2.md`
+5. `docs/15_Benchmark_Training_and_Eval_Tiering.md`
+6. `docs/16_Document_Math_Parse_Canonical_Format.md`
+
+Current status:
+
+- `docs/13_IRIS_Math_v2_Charter.md` is the active direction charter.
+- `docs/14..16` are transition proposals and do not by themselves approve
+  conflicting implementation work.
+- No approved IRIS-math replacement spec has yet superseded the historical
+  baseline architecture contracts.
 
 ---
 
-## 2. Reading Paths
+## 2. Canonical Workflow and Governance Docs Still in Use
 
-### 2.1 New Engineer Path
+These remain active workflow references unless an approved transition spec
+explicitly supersedes a surface:
 
-1. `docs/10_Glossary_and_Normative_Status.md`
-2. `docs/01_Architecture_Constitution.md`
-3. `docs/02_State_IR_Spec.md`
-4. `docs/03_Level_Contracts_L0-L6.md`
-5. `docs/06_Regression_and_Phase_Gates.md`
+1. `docs/05_Eval_Metrics_Spec.md`
+2. `docs/06_Regression_and_Phase_Gates.md`
+3. `docs/08_Training_Run_Governance.md`
 
-### 2.2 Research/Architecture Path
+---
+
+## 3. Historical Baseline References
+
+These docs describe the baseline IRIS stack and are retained for compatibility
+checks, migration impact analysis, and blocked-surface traceability:
 
 1. `docs/01_Architecture_Constitution.md`
 2. `docs/02_State_IR_Spec.md`
 3. `docs/03_Level_Contracts_L0-L6.md`
 4. `docs/04_Credit_Assignment_and_Recovery.md`
+5. `docs/07_Data_Mixture_and_Ingestion.md`
+6. `docs/09_Training_Profile_SingleH100_3B.md`
+7. `docs/11_Phase_D_Diagnostics_Design_Note.md`
+8. `docs/12_Phase_E_Execution_Design_Note.md`
+
+These are not the default build target for new IRIS-math work.
+
+---
+
+## 4. Operational Planning Bundle
+
+The active Codex planning bundle lives under `docs/codex_plan/`:
+
+- `docs/codex_plan/Prompt.md`
+- `docs/codex_plan/Plan.md`
+- `docs/codex_plan/Documentation.md`
+
+Historical baseline runbook:
+
+- `docs/codex_plan/Implement.md`
+
+---
+
+## 5. Reading Paths
+
+### 5.1 IRIS-math Control-Plane Path
+
+1. `docs/10_Glossary_and_Normative_Status.md`
+2. `docs/13_IRIS_Math_v2_Charter.md`
+3. `docs/14_IRIS_Math_Data_Constitution_v2.md`
+4. `docs/15_Benchmark_Training_and_Eval_Tiering.md`
+5. `docs/16_Document_Math_Parse_Canonical_Format.md`
+6. Relevant workflow docs: `docs/05`, `docs/06`, `docs/08`
+7. Historical baseline docs only as needed
+
+### 5.2 Data / Parser / Eval Path
+
+1. `docs/13_IRIS_Math_v2_Charter.md`
+2. `docs/14_IRIS_Math_Data_Constitution_v2.md`
+3. `docs/15_Benchmark_Training_and_Eval_Tiering.md`
+4. `docs/16_Document_Math_Parse_Canonical_Format.md`
 5. `docs/05_Eval_Metrics_Spec.md`
+6. `docs/06_Regression_and_Phase_Gates.md`
+7. `docs/08_Training_Run_Governance.md`
 
-### 2.3 Training/Operations Path
+### 5.3 Historical Compatibility Path
 
-1. `docs/08_Training_Run_Governance.md`
-2. `docs/09_Training_Profile_SingleH100_3B.md`
-3. `docs/07_Data_Mixture_and_Ingestion.md`
-4. `docs/06_Regression_and_Phase_Gates.md`
-5. `docs/05_Eval_Metrics_Spec.md`
-
----
-
-## 3. Legacy/Removed → Consolidated Mapping
-
-Entries marked **REMOVED (2026-02-27)** no longer exist as files; they are listed only to help migrate older links/notes.
-
-| Legacy Source | Consolidated Destination |
-| --- | --- |
-| **REMOVED (2026-02-27)** `docs/System Invariants & Non-Negotiables.md` | `docs/01_Architecture_Constitution.md` |
-| **REMOVED (2026-02-27)** `docs/What This Model Is Explicitly NOT.md` | `docs/01_Architecture_Constitution.md` |
-| **REMOVED (2026-02-27)** `docs/Single Trunk Contract & Allowed Variations.md` | `docs/01_Architecture_Constitution.md` |
-| **REMOVED (2026-02-27)** `docs/Routing, Gating, and Control Are Learnable.md` | `docs/01_Architecture_Constitution.md` |
-| **REMOVED (2026-02-27)** `docs/State IR Canonical Spec.md` | `docs/02_State_IR_Spec.md` |
-| **REMOVED (2026-02-27)** `docs/State IR Examples & Edge Cases.md` | `docs/02_State_IR_Spec.md` |
-| **REMOVED (2026-02-27)** `docs/Level Contracts/Level 0–1 Contract.md` | `docs/03_Level_Contracts_L0-L6.md` |
-| **REMOVED (2026-02-27)** `docs/Level Contracts/Level 2 Contract.md` | `docs/03_Level_Contracts_L0-L6.md` |
-| **REMOVED (2026-02-27)** `docs/Level Contracts/Level 3–4 Contract.md` | `docs/03_Level_Contracts_L0-L6.md` |
-| **REMOVED (2026-02-27)** `docs/Level Contracts/Level 5–6 Contract.md` | `docs/03_Level_Contracts_L0-L6.md` |
-| **REMOVED (2026-02-27)** `docs/Credit Assignment & Failure Recovery Model.md` | `docs/04_Credit_Assignment_and_Recovery.md` |
-| **REMOVED (2026-02-27)** `docs/harness/legacy/metrics.md` | `docs/05_Eval_Metrics_Spec.md` |
-| **REMOVED (2026-02-27)** `docs/harness/legacy/regression.md` | `docs/06_Regression_and_Phase_Gates.md` |
-| **REMOVED (2026-02-27)** `docs/harness/legacy/phase-gate-policy.md` | `docs/06_Regression_and_Phase_Gates.md` |
-| **REMOVED (2026-02-27)** `docs/Data Mixture & Ingestion Specification.md` | `docs/07_Data_Mixture_and_Ingestion.md` |
-| **REMOVED (2026-02-27)** `docs/Training Segment and Resume Rules (Design Note).md` | `docs/08_Training_Run_Governance.md` |
-| **REMOVED (2026-02-27)** `docs/Pretraining Objective Spec.md` | `docs/08_Training_Run_Governance.md` |
-| **REMOVED (2026-02-27)** `docs/plan/reproducibility-and-resume-exactly-once-spec.md` | `docs/08_Training_Run_Governance.md` |
-| **REMOVED (2026-02-27)** `docs/plan/runtime-stack-lock-jax-flax-nnx.md` | `docs/08_Training_Run_Governance.md` |
-| **REMOVED (2026-02-27)** `docs/plan/single-h100-3b-training-profile.md` | `docs/09_Training_Profile_SingleH100_3B.md` |
-| **REMOVED (2026-02-27)** `docs/plan/single-h100-3b-open-decisions.md` | `docs/09_Training_Profile_SingleH100_3B.md` |
-| **REMOVED (2026-02-27)** `docs/模型架構設計.md` | `docs/01_Architecture_Constitution.md` (appendix) |
+1. `docs/10_Glossary_and_Normative_Status.md`
+2. Relevant active transition docs
+3. Relevant historical baseline docs for impact analysis
 
 ---
 
-## 4. Authority Reminder
+## 6. Authority Reminder
 
-- The authoritative normative contracts are:
-  - `docs/01_Architecture_Constitution.md`
-  - `docs/02_State_IR_Spec.md`
-  - `docs/03_Level_Contracts_L0-L6.md`
-  - `docs/04_Credit_Assignment_and_Recovery.md`
-- Metrics vocabulary and regression workflow are binding and live in `docs/05_Eval_Metrics_Spec.md` and `docs/06_Regression_and_Phase_Gates.md`.
+- AGENTS or a design note cannot by themselves legalize conflicting
+  architecture, data, parser, or evaluation changes.
+- Approved transition specs are the only documents that can replace historical
+  baseline authority for a given IRIS-math surface.
+- Transition proposals control planning and migration behavior but are not
+  approval on their own.
+- Canonical workflow docs remain active unless explicitly superseded.
 
 ---
 
-## 5. Phase Execution Notes (Non-normative)
+## 7. Historical Mapping Note
 
-- `docs/11_Phase_D_Diagnostics_Design_Note.md`
-- `docs/12_Phase_E_Execution_Design_Note.md`
+The repo was previously organized around a consolidated baseline IRIS stack
+(`docs/01..12`). That baseline material remains in the repo for reference, but
+the active direction is now governed by the transition-control set in Section
+1.
