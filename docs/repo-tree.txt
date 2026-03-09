@@ -209,13 +209,14 @@ Omitted: *.tar, /data, *.json, /package, *.whl, /wheels, /.pytest_cache, /.venv-
     04_Credit_Assignment_and_Recovery.md
     05_Eval_Metrics_Spec.md
     06_Regression_and_Phase_Gates.md
-    07_Data_Mixture_and_Ingestion.md
+    07_Data_Constitution.md
     08_Training_Run_Governance.md
-    09_Training_Profile_SingleH100_3B.md
+    09_Training_Profiles_and_Scaling.md
     10_Glossary_and_Normative_Status.md
     11_Phase_D_Diagnostics_Design_Note.md
     12_Phase_E_Execution_Design_Note.md
     repo-tree.txt
+    數學模型建議.md
   iris/
     __pycache__/
     __init__.py

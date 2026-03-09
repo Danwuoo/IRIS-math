@@ -2,112 +2,94 @@
 
 **Document Type:** Canonical Binding Workflow  
 **Metric Vocabulary Source:** `docs/05_Eval_Metrics_Spec.md`  
-**Scope:** Regression suites (S1–S8), phase activation (A–E), gate semantics, tolerance/baseline policy, required artifacts, and promotion criteria  
-**Source lineage:** Consolidated from legacy regression/phase-gate docs (removed on 2026-02-27).
-
----
-
-> Purpose question: **「我修了 A，是否悄悄毀了 B？」**
+**Scope:** Regression suites `S1-S8`, phase activation `A-E`, gate semantics, tolerance policy, required artifacts, and promotion criteria for IRIS-math v2
 
 ---
 
 ## 0. Scope and Authority
 
-This document is **normative for development workflow**.
+This document governs how architecture-, data-, training-, parser-, verifier-, and eval-impacting changes are validated.
 
-Any architectural, training, or evaluation-impacting change **MUST** be evaluated against this regression harness **before** being considered valid.
+If a change improves aggregate score but violates an active regression gate, the change is rejected.
 
-If a change improves aggregate outcome but violates a regression gate defined here, the change is **rejected**.
-
-This workflow is subordinate only to:
-
-- System invariants and non-negotiables
-- Trunk and State IR contracts
-- Level contracts (L0–L6)
-- Credit assignment and failure recovery contract
-- Learnable routing/gating/control contract
+The repository is in a documentation-first transition.
+Legacy ARC-family probes may still appear as compatibility signals, but they are not sufficient by themselves to define v2 readiness.
 
 ---
 
-## 1. Regression Philosophy (Non-Negotiable)
+## 1. Regression Philosophy
 
-### 1.1 Regression ≠ Accuracy
+### 1.1 Regression Is Not Just Accuracy
 
-Regression testing answers **stability questions**, not performance questions.
+Regression answers:
 
-We care about:
+- did we preserve the right capability structure,
+- did failure attribution remain meaningful,
+- did contamination discipline remain intact,
+- did verifier-grounded behavior stay calibrated.
 
-- Capability preservation
-- Failure localization stability
-- Credit routing consistency
-- Concept isolation
+### 1.2 Named Failure Is Still the Atomic Unit
 
-A model that is *better on average* but *worse in attribution or isolation* is considered **regressed**.
+All regression results must be explainable in canonical failure-taxonomy terms.
 
-### 1.2 Named Failure Is the Atomic Unit
+### 1.3 Process and Governance Stability Come First
 
-All regression signals are defined over **failure types**, not tasks.
+Primary priorities:
 
-If a regression cannot be mapped to a known failure category, that indicates:
+- failure attribution,
+- calibration,
+- strategy diversity,
+- contamination control,
+- provenance coverage,
+- resume consistency.
 
-- Missing failure taxonomy, or
-- Insufficient verifier/diagnostic signal
-
-The correct response is **to improve diagnostics**, not to waive regression.
-
-### 1.3 Pretraining-First Priority
-
-Regression prioritizes **process/diagnostic stability** over outcome gains:
-
-- Primary: failure attribution, credit routing, calibration, concept isolation, paired invariance
-- Secondary: task success rate / aggregate benchmark score
-
-If secondary improves while primary degrades, the change is rejected.
+Outcome gains do not waive primary regressions.
 
 ---
 
-## 2. Phase Definitions (A–E)
-
-Phases define phase-appropriate scope boundaries and gate activation expectations.
+## 2. Phase Definitions (`A-E`)
 
 ### Phase A
 
-Diagnostics-first bootstrap:
+Diagnostics bootstrap:
 
-- Verifier signals
-- Failure tags
-- Trace/logging skeleton
-- No solver heuristics as primary policy
+- parser / verifier / provenance instrumentation,
+- failure tags,
+- no solver heuristics as primary policy.
 
 ### Phase B
 
-Tool generation and alignment:
+Data-constitution and benchmark-tier plumbing:
 
-- Failure-tag alignment
-- Paired-task plumbing
-- No correctness encoded into tool internals
+- Tier 1 disclosure,
+- homologous split setup,
+- paired reformulation plumbing,
+- no uncontrolled benchmark mixing.
 
 ### Phase C
 
-Minimal closed loop in `src/`:
+Minimal closed loop:
 
-- All Level interfaces L0–L6 present (mounted or stubbed)
-- Credit/failure attribution live
-- Pretraining-first process diagnostics enforced
+- all level interfaces `L0-L6` present,
+- credit routing live,
+- v2 docs active,
+- baseline implementation still allowed to lag explicitly.
 
 ### Phase D
 
-Concept diagnostics:
+Document-grounded diagnostic maturity:
 
-- Concept isolation/leakage monitoring through ConceptARC
-- Attribution and diagnostic stability prioritized over leaderboard score
+- document / OCR / diagram reformulation checks,
+- concept isolation,
+- contamination audit becomes first-class.
 
 ### Phase E
 
-Regression and verifier harness hardening:
+Frontier regression and verifier hardening:
 
-- `arc-agi-benchmarking` as regression/verifier probe harness
-- No benchmark-shaped architectural shortcuts
+- strict held-out frontier evaluation,
+- strong verifier evidence,
+- resume consistency and governance artifacts fully required.
 
 ---
 
@@ -115,377 +97,259 @@ Regression and verifier harness hardening:
 
 Each regression run must declare:
 
-- `phase`: one of `A`, `B`, `C`, `D`, `E`
-- `baseline_id`: immutable baseline reference
-- `tolerance_profile_id`: identifier for epsilon/tolerance configuration
+- `phase`
+- `baseline_id`
+- `tolerance_profile_id`
 
 Rules:
 
-1. Tolerances (`epsilon`, calibration tolerance, leakage tolerance) must be fixed per `phase + tolerance_profile_id`.
-2. Tolerances cannot be relaxed within the same profile after baseline freeze.
-3. Profile changes require explicit annotation in regression artifacts.
+1. Tolerances are fixed per `phase + tolerance_profile_id`.
+2. Tolerances cannot silently relax inside the same profile.
+3. Baseline changes must be explicitly documented.
 
 ---
 
-## 4. Canonical Failure Taxonomy (Regression Keys)
+## 4. Canonical Failure Taxonomy
 
-Regression diffs and gates are indexed by canonical failure categories and Level responsibility.
+Regression keys remain:
 
-Canonical codes live in `docs/05_Eval_Metrics_Spec.md`:
+- `F_REP`
+- `F_PROC`
+- `F_SEARCH`
+- `F_MEM`
+- `F_ABS`
+- `F_EVAL`
 
-- `F_REP` (L0/L1)
-- `F_PROC` (L2)
-- `F_SEARCH` (L3)
-- `F_MEM` (L4)
-- `F_ABS` (L5)
-- `F_EVAL` (L6)
+The semantics come from `docs/04_Credit_Assignment_and_Recovery.md`.
 
 ---
 
 ## 5. Regression Axes
 
-Every regression run evaluates orthogonal axes. A change is accepted only if it does not regress on any axis, unless explicitly waived.
+### 5.1 Data Axis
 
-### 5.1 Dataset Axis
+Runs must, where applicable, cover:
 
-Minimum required coverage (phase-dependent activation):
+- core pool behavior,
+- document-native inputs,
+- formal / semi-formal tasks,
+- declared benchmark tiers,
+- archive compatibility probes if still retained.
 
-- MiniARC (sanity & edge cases)
-- ARC-AGI-1 (baseline stability)
-- ARC-AGI-2 (core stress)
-- re-arc paired tasks (representation invariance)
-- ConceptARC (concept isolation)
-- arc-agi-benchmarking (probe/regression harness only)
+### 5.2 Reformulation Axis
 
-### 5.2 Concept Axis
+Check equivalence across:
 
-Measured per concept bucket (ConceptARC):
-
-- Single-concept success
-- Cross-concept interference
-- Concept leakage rate
+- textual restatements,
+- OCR / clean-text variants,
+- diagram / text variants,
+- homologous benchmark variants,
+- paired tasks retained from legacy probes.
 
 ### 5.3 Level Axis
 
-For each Level (L0–L6):
+For each `L0-L6`, track:
 
-- Invocation frequency
-- Diagnostic signal entropy
-- Credit assignment mass
+- invocation behavior,
+- diagnostic entropy,
+- credited mass,
+- mounted vs stub distinction.
 
-### 5.4 Control Axis
+### 5.4 Control and Governance Axis
 
-- Budget stability (search depth, beam, rollout)
-- Termination consistency
-- Sensitivity to noise / seed
+Track:
+
+- budget usage,
+- termination behavior,
+- recovery quality,
+- contamination audit status,
+- provenance coverage,
+- resume stability.
 
 ---
 
-## 6. Required Regression Suites (S1–S8)
+## 6. Required Regression Suites (`S1-S8`)
 
-In this section, “mandatory” means mandatory once activated by the current phase profile (see Section 7).
+### S1: Smoke Regression
 
-### S1: Smoke Regression (Fast)
+Purpose:
 
-Purpose: Detect catastrophic breakage.
+- detect crash, parser failure, verifier failure, missing artifacts.
 
-Coverage:
+Hard block on:
 
-- MiniARC (full)
-- ARC-AGI-1 (small fixed subset)
-
-Checks:
-
-- Parser validity
-- Verifier executable
-- No NaNs / crashes
-- Basic success rate within tolerance
-
-Gate:
-
-- Any crash or parser failure → **hard block**
+- runtime crash,
+- broken parser / verifier path,
+- missing required output artifact.
 
 ### S2: Structural Regression
 
-Purpose: Ensure architectural contracts remain intact.
+Purpose:
+
+- ensure the active contracts are still structurally respected.
 
 Checks:
 
-- All Levels instantiated (stub acceptable)
-- No token schema drift (State IR ordering and token types)
-- Tokenizer protected IR/control strings remain atomic (`rep.tokenizer.ir_fragmentation_rate == 0` once configured)
-- No new hard-coded control paths
-- Routing outputs remain learnable (non-degenerate)
-
-Gate:
-
-- Any invariant violation → **hard block**
+- all `L0-L6` interfaces exist,
+- no uncontrolled State IR drift,
+- no hard-coded semantic control path replaces learned policy,
+- data constitution / profile references are internally consistent.
 
 ### S3: Failure-Profile Regression
 
-Purpose: Detect silent redistribution of errors.
+Purpose:
 
-Method:
-
-- Compare failure taxonomy histograms before/after change
-- Measure divergence per failure category (e.g., KL)
-
-Gate:
-
-- Large unexplained shift in failure distribution → **block**
-- Shift explained by explicit design goal → **allowed with annotation**
+- detect silent redistribution of errors across the canonical taxonomy.
 
 ### S4: Concept Isolation Regression
 
-Purpose: Ensure concepts remain independently usable.
+Purpose:
 
-Method:
+- ensure math concepts remain usable in isolation and under composition.
 
-- Run ConceptARC per concept bucket
-- Measure:
-  - Concept isolation score
-  - Concept leakage score
+Accepted probes may include:
 
-Gate:
-
-- Any concept whose isolation decreases beyond tolerance → **block**
+- active math concept buckets,
+- document-grounded concept buckets,
+- legacy compatibility probes retained during transition.
 
 ### S5: Paired Representation Regression
 
-Purpose: Detect representation overfitting.
+Purpose:
 
-Data:
+- detect reformulation brittleness.
 
-- re-arc paired tasks (A/B with semantic invariance)
+Examples:
 
-Checks:
-
-- A success but B failure → representation sensitivity
-- Divergent internal programs for invariant pairs
-
-Gate:
-
-- Increased asymmetry rate → **block**
+- OCR vs clean text,
+- theorem statement restatement,
+- diagram vs textual variant,
+- legacy paired tasks kept for compatibility.
 
 ### S6: Credit Routing Regression
 
-Purpose: Ensure diagnosis logic remains stable.
+Purpose:
 
-Method:
-
-- Compare L6 credit distributions for identical failure cases
-
-Gate:
-
-- Collapse to single-Level blame
-- Excessive entropy loss
-
-Either condition → **block**
+- ensure `failure.credit` remains meaningful and does not collapse.
 
 ### S7: Pretraining Diagnostics Regression
 
-Purpose: Keep pretraining process metrics stable across updates.
+Purpose:
 
-Method:
+- keep process, governance, and contamination signals stable.
 
-- Compare before/after on:
-  - `failure.credit.collapse_rate`
-  - `eval.calibration_error`
-  - `prog.diversity`
-  - `rep.tokenizer.ir_fragmentation_rate` (text/IR-control pipelines only)
-  - `search.termination_margin` (failure-masking checks)
+Monitored examples include:
 
-Gate:
-
-- Credit collapse rate increase beyond tolerance → **block**
-- Calibration degradation beyond tolerance → **block**
-- Program diversity collapse → **block**
-- Any increase in `rep.tokenizer.ir_fragmentation_rate` beyond tolerance → **block**
-- Cost gain caused by failure masking → **block**
+- `failure.credit.collapse_rate`
+- `eval.calibration_error`
+- `prog.diversity`
+- `search.termination_margin`
+- `rep.tokenizer.ir_fragmentation_rate`
+- `contam.strict_holdout_leakage_score`
+- `provenance.parser_coverage`
 
 ### S8: Resume Consistency Regression
 
-Purpose: Prevent semantic drift between uninterrupted and resumed training.
+Purpose:
 
-Method:
+- prevent semantic drift between uninterrupted and resumed runs.
 
-- Fix runtime lock manifest, seed, and dataset slice identity.
-- Path A: run `N` segments without interruption.
-- Path B1: inject crash during `execute` and resume.
-- Path B2: inject crash after `execute` and before checkpoint commit (`pre-commit`).
-- Path B3: inject crash after checkpoint commit (`post-commit`) with journal reconciliation.
-- For each resumed path, compare segment-aligned distributions at identical boundaries using `task.validity_score`, `task.confidence`, `failure.credit`.
-- Emit drift diagnosis labels: `runtime_drift`, `rng_drift`, `data_slice_drift`, `optimizer_state_drift`.
+Crash classes remain:
 
-Gate:
-
-- Any drift above epsilon defined in tolerance profile → **block**
-- Missing or inconsistent segment boundary alignment → **block**
-- Missing crash-class coverage (`execute`, `pre-commit`, `post-commit`) when S8 is ON → **block**
-- Missing drift diagnosis labels/artifacts for failed S8 → **block**
+- execute crash,
+- pre-commit crash,
+- post-commit crash.
 
 ---
 
-## 7. Suite Activation Matrix (A–E)
+## 7. Suite Activation Matrix
 
-Suites are activated by phase. Activation states:
+Activation states:
 
-- `ON` = blocking gate
-- `OBSERVE` = collect/report only, non-blocking
-- `OFF` = not required in this phase
+- `ON` = blocking
+- `OBSERVE` = report-only
+- `OFF` = not required
 
-| Suite ID | Suite Name | A | B | C | D | E |
-| --- | --- | --- | --- | --- | --- | --- |
-| S1 | Smoke Regression | ON | ON | ON | ON | ON |
-| S2 | Structural Regression | ON | ON | ON | ON | ON |
-| S3 | Failure-Profile Regression | OBSERVE | OBSERVE | ON | ON | ON |
-| S4 | Concept Isolation Regression | OFF | OBSERVE | ON | ON | ON |
-| S5 | Paired Representation Regression | OFF | OBSERVE | ON | ON | ON |
-| S6 | Credit Routing Regression | OBSERVE | OBSERVE | ON | ON | ON |
-| S7 | Pretraining Diagnostics Regression | OBSERVE | OBSERVE | ON | ON | ON |
-| S8 | Resume Consistency Regression | OFF | OFF | ON | ON | ON |
-
----
-
-## 8. Gate Semantics
-
-Regression gates are **binary** unless explicitly marked otherwise.
-
-### 8.1 Hard Gates (Non-Waivable When Suite Is `ON`)
-
-Hard gates apply when their corresponding suites/metrics are `ON` for the current phase profile:
-
-- System invariant violation
-- Token schema drift
-- Removal or bypass of a Level interface (including via deleting its I/O contract/stub)
-- Hard-coded control replacing learned routing/gating
-- Verifier non-functional
-- Credit attribution collapse (`failure.credit.collapse_rate` beyond tolerance)
-- Calibration degradation (`eval.calibration_error` beyond tolerance)
-- Concept leakage increase (`concept.leakage_score` beyond tolerance)
-- Paired invariance regression (`paired.invariance.gap` beyond tolerance)
-- Failure distribution drift not explained by declared intent
-- Any failure category rate increases by > ε without compensating decrease elsewhere (ε from `tolerance_profile_id`)
-- Cost decreases only by masking failures (e.g., early termination)
-- When S8 is `ON`: resume drift exceeds tolerance, crash-class coverage is incomplete, or resume provenance is missing
-
-### 8.2 Soft Gates (Waivable With Justification)
-
-Soft gate waivers are permitted only with explicit annotation:
-
-- Failure category affected
-- Short-term reason
-- Intended long-term fix
-- Removal criterion
-
-Soft gate examples:
-
-- Minor performance loss with structural gain
-- Temporary increase in search cost
-- Known diagnostic rebalancing
+| Suite | A | B | C | D | E |
+| --- | --- | --- | --- | --- | --- |
+| `S1` | ON | ON | ON | ON | ON |
+| `S2` | ON | ON | ON | ON | ON |
+| `S3` | OBSERVE | OBSERVE | ON | ON | ON |
+| `S4` | OFF | OBSERVE | ON | ON | ON |
+| `S5` | OFF | OBSERVE | ON | ON | ON |
+| `S6` | OBSERVE | OBSERVE | ON | ON | ON |
+| `S7` | OBSERVE | OBSERVE | ON | ON | ON |
+| `S8` | OFF | OFF | ON | ON | ON |
 
 ---
 
-## 9. Required Artifacts (Regression Outputs)
+## 8. Hard-Gate Semantics
 
-Each regression run **must** produce:
+When a relevant suite is `ON`, the following are hard blocks:
 
-1. **Summary report**
-   - Pass/fail per suite
-   - Block reasons (if any)
-2. **Failure profile diff**
-   - Before/after histograms
-3. **Concept breakdown**
-   - Per-concept isolation & leakage
-4. **Credit routing diff**
-   - L6 distributions comparison
-5. **Resume consistency packet** (required when S8 is ON)
-   - Segment journal diff (`PENDING/APPLIED` reconciliation)
-   - Checkpoint lineage for last applied segment
-   - Runtime lock manifest id/sha used by each run path
-   - Drift diagnosis label summary (`runtime/rng/data/optimizer`)
+- architectural invariant violation,
+- uncontrolled State IR drift,
+- deletion or bypass of a level interface,
+- deterministic control replacing learned policy,
+- verifier non-functionality,
+- credit collapse,
+- calibration degradation beyond tolerance,
+- contamination leakage beyond tolerance,
+- missing required provenance coverage,
+- unexplained failure-distribution drift,
+- resume drift beyond tolerance.
 
-Required run metadata includes (minimum):
+Outcome gains do not waive these failures.
+
+---
+
+## 9. Required Artifacts
+
+Each regression run must produce:
+
+1. summary report,
+2. failure-profile diff,
+3. concept / reformulation breakdown,
+4. credit-routing diff,
+5. contamination / provenance audit summary when relevant,
+6. resume consistency packet when `S8` is active.
+
+Required metadata includes:
 
 - `phase`
 - `baseline_id`
 - `tolerance_profile_id`
-
-Artifacts are stored under a versioned directory and must be retained.
+- mandatory docs consulted
 
 ---
 
 ## 10. Promotion Criteria
 
-### A → B
+### `A -> B`
 
-- S1/S2 stable
-- Verifier and failure taxonomy logging available
+- parser / verifier / provenance instrumentation is usable,
+- `S1` / `S2` stable.
 
-### B → C
+### `B -> C`
 
-- L0–L6 interfaces wired (stub allowed)
-- Credit routing vector emitted and serialized
-- S3/S6/S7 promoted from observe to blocking
+- benchmark tiering and contamination disclosure exist,
+- `L0-L6` interfaces are wired,
+- `failure.credit` is emitted.
 
-### C → D
+### `C -> D`
 
-- Concept leakage/isolation instrumentation stable
-- S4/S5 active and stable under fixed tolerance profile
+- reformulation and document-grounded diagnostics are stable,
+- contamination audit is active,
+- `S4` / `S5` are stable under fixed tolerances.
 
-### D → E
+### `D -> E`
 
-- Resume consistency (S8) stable
-- Full regression artifact pipeline retained across runs
-
----
-
-## 11. Change Classification (Required Declaration)
-
-Every change must declare its expected regression impact:
-
-- Pure refactor (no behavior change expected)
-- Targeted fix (which failure category?)
-- Capability expansion (which concepts?)
-
-Undeclared changes that cause regressions are **automatically rejected**.
+- strict held-out frontier evaluation is alive,
+- verifier evidence is strong,
+- `S8` and governance artifacts are stable.
 
 ---
 
-## 12. When Regression Fails
+## 11. Final Rule
 
-If a regression gate blocks a change:
-
-1. Identify **which failure category regressed**
-2. Identify **which Level is implicated**
-3. Decide one of:
-   - Fix the regression
-   - Narrow the change scope
-   - Improve diagnostics (if attribution is unclear)
-
-Ignoring a regression is **never** acceptable.
-
----
-
-## 13. Migration Note
-
-Legacy `DevelopmentPlan.md` is intentionally retired (removed on 2026-02-27).
-Any previous references must point to this document.
-
----
-
-## 14. Explicit Non-Goals
-
-This regression harness does **not**:
-
-- Optimize leaderboard scores
-- Guarantee monotonic accuracy gains
-- Provide human-readable explanations
-
-Its sole role is to preserve architectural integrity over time.
-
----
-
-## 15. Final Rule
-
-> If you cannot explain why a regression is acceptable in terms of Level responsibility and failure taxonomy, it is not acceptable.
+If a change cannot explain its effect in terms of failure taxonomy, verifier-grounded diagnostics, and governance discipline, it is not ready for promotion.

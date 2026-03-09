@@ -1,319 +1,207 @@
 # Eval Metrics Spec
 
-**Document Type:** Canonical Binding Vocabulary  
-**Audience:** Model / Tool / Evaluation / Training Pipeline  
-**Scope:** Metric names, field semantics, and required metadata for logging/artifacts  
-**Boundary:** This file defines metric vocabulary and semantics only. Regression suites, phase activation, and gate workflow are defined in `docs/06_Regression_and_Phase_Gates.md`.  
-**Source lineage:** Consolidated from a legacy metrics spec (removed on 2026-02-27).
+**Document Type:** Canonical Binding Policy  
+**Audience:** Model, training, evaluation, parser, formalizer, and verifier pipelines  
+**Scope:** Canonical metric names, field semantics, and required metadata for IRIS-math v2
 
 ---
 
-## 0. Purpose and Non-Goals
+## 0. Purpose and Boundary
 
-### 0.1 Purpose
+This document defines the canonical metrics vocabulary used to describe:
 
-This document defines a **single, unified metrics vocabulary** for the entire system, covering:
+- mathematical outcome quality,
+- failure taxonomy,
+- level-specific diagnostics,
+- contamination and provenance health,
+- regression gate inputs.
 
-- Failure taxonomy (semantic, Level-addressable)
-- Diagnostic signals emitted by each Level
-- Verifier- and controller-consumable scores
-- Regression and gate input metrics
-
-The metrics defined here are the **only allowed basis** for:
-
-- Credit routing (L6 → others)
-- Recovery strategy selection (via L3)
-- Benchmark interpretation (ConceptARC, arc-agi-benchmarking)
-- Architecture/training change validation (“did we break something?”)
-
-### 0.2 Explicit Non-Goals
-
-This document does **not**:
-
-- Define loss functions
-- Define optimization algorithms
-- Define training schedules
-- Define regression suites, suite activation matrices, or phase gates (see `docs/06_Regression_and_Phase_Gates.md`)
-- Replace Level Contracts or System Invariants
-
-Metrics describe **what is observed**, not **how learning happens**.
+This document defines **what is measured**, not which suites are active.
+Suite activation lives in `docs/06_Regression_and_Phase_Gates.md`.
 
 ---
 
-## 1. Metric Taxonomy Overview
+## 1. Metric Classes
 
-All metrics fall into one of four classes:
+All canonical metrics fall into one of these classes:
 
-1. **Outcome Metrics (Secondary)** – Was the final result acceptable?
-2. **Failure Taxonomy Metrics (Primary)** – *Why* did it fail, semantically?
-3. **Process / Diagnostic Metrics (Primary)** – What happened internally?
-4. **Regression Gate Input Metrics (Hard-Gate Inputs)** – What the gate consumes when activated
+1. outcome metrics,
+2. failure-taxonomy metrics,
+3. process / diagnostic metrics,
+4. governance metrics.
 
-Only these four classes are permitted.
+Optimization priority remains:
 
-Optimization priority is fixed:
-
-- **Primary**: Failure Taxonomy + Process/Diagnostic
-- **Secondary**: Outcome (success/score/cost)
+- **Primary:** failure taxonomy + process / diagnostic + governance integrity
+- **Secondary:** aggregate success / benchmark score / cost
 
 ---
 
-## 2. Outcome Metrics (Global, Secondary)
-
-### 2.1 Task-Level Outcome
+## 2. Outcome Metrics
 
 | Metric | Type | Description |
 | --- | --- | --- |
-| `task.success` | bool | Final output accepted by verifier |
-| `task.validity_score` | float ∈ [0,1] | Verifier validity (continuous) |
-| `task.confidence` | float ∈ [0,1] | Calibrated confidence (L6) |
+| `task.success` | bool | Final output accepted by the active verifier policy |
+| `task.validity_score` | float | Continuous validity score |
+| `task.confidence` | float | Calibrated confidence |
+| `task.proof_validity_score` | float | Proof-validity score when proof-bearing output exists |
+| `task.document_grounding_score` | float | Quality of source-grounded reasoning when document anchors exist |
 
 Rules:
 
-- `task.success` MUST be derived from verifier logic, not dataset labels directly.
-- Confidence MUST be separable from correctness.
-- Outcome metrics are probe signals; they are not the primary pretraining objective.
-
-### 2.2 Cost / Efficiency (Secondary)
-
-| Metric | Type | Notes |
-| --- | --- | --- |
-| `cost.total_steps` | int | Total reasoning cycles |
-| `cost.program_proposals` | int | Total L2 proposals |
-| `cost.rollout_steps` | int | L1 unroll depth (sum) |
-| `cost.retrieval_calls` | int | L4 reads |
-
-These metrics **must never** be used alone to judge model quality.
+- `task.success` must come from verifier logic or an explicitly declared evaluation policy, not raw label lookup.
+- `task.confidence` must remain separable from correctness.
 
 ---
 
-## 3. Failure Taxonomy (Canonical)
+## 3. Failure Taxonomy
 
-Failure taxonomy is **semantic**, **Level-addressable**, and **exclusive** in definition (but credit may be distributed).
-
-### 3.1 Failure Category Codes
+The canonical codes remain:
 
 | Code | Category | Primary Level |
 | --- | --- | --- |
-| `F_REP` | Representation Failure | L0 / L1 |
-| `F_PROC` | Procedural Failure | L2 |
-| `F_SEARCH` | Search / Budget Failure | L3 |
-| `F_MEM` | Memory Failure | L4 |
-| `F_ABS` | Abstraction Failure | L5 |
-| `F_EVAL` | Evaluation / Calibration Failure | L6 |
+| `F_REP` | Representation Failure | `L0/L1` |
+| `F_PROC` | Procedural Failure | `L2` |
+| `F_SEARCH` | Search / Recovery Failure | `L3` |
+| `F_MEM` | Memory Failure | `L4` |
+| `F_ABS` | Abstraction Failure | `L5` |
+| `F_EVAL` | Evaluation Failure | `L6` |
 
-These codes are **mandatory**. No ad-hoc categories are allowed.
-
-### 3.2 Failure Attribution Vector (Mandatory)
-
-For every failed (or low-confidence) attempt, the system MUST emit:
-
-```text
-failure.credit = {
-  L0: c0,
-  L1: c1,
-  L2: c2,
-  L3: c3,
-  L4: c4,
-  L5: c5,
-  L6: c6
-}
-```
-
-Constraints:
-
-- `ck ∈ [0,1]`
-- `Σ ck = 1`
-- Produced by **L6 Credit Router**
-- Consumed by **L3 recovery policy** and training
-
-Hard attribution (single Level) is **not allowed**.
+Every failed or low-confidence attempt must emit `failure.credit` over `L0..L6`.
 
 ---
 
 ## 4. Level-Specific Diagnostic Metrics
 
-### 4.1 Level 0–1 (Representation & Dynamics)
-
-| Metric | Type | Description |
-| --- | --- | --- |
-| `rep.object.count` | int | Number of object tokens |
-| `rep.relation.count` | int | Number of relation tokens |
-| `rep.event.count` | int | Number of event tokens |
-| `rep.object.entropy` | float | Slot / assignment uncertainty |
-| `dyn.violation_score` | float | Constraint / energy violation |
-| `dyn.uncertainty` | float | Predictive uncertainty |
-| `rep.tokenizer.unk_rate` | float | Fraction of `UNK` tokens in text inputs (0 if none) |
-| `rep.tokenizer.ir_fragmentation_rate` | float | Protected IR/control strings split into >1 token |
-
-Interpretation:
-
-- High entropy + downstream failure → `F_REP`
-- Low entropy but wrong → likely upstream masking (invalid)
-- Non-zero `rep.tokenizer.ir_fragmentation_rate` → control/markup instability (`F_REP` or downstream `F_PROC`)
-
-### 4.2 Level 2 (Program Induction & Execution)
-
-| Metric | Type | Description |
-| --- | --- | --- |
-| `prog.count` | int | Programs proposed |
-| `prog.diversity` | float | Embedding dispersion |
-| `prog.exec.success_rate` | float | Partial execution viability |
-| `prog.exec.instability` | float | Sensitivity to small perturbations |
-| `prog.score.spread` | float | Score variance |
-
-Interpretation:
-
-- Low diversity + failure → premature convergence
-- High exec instability → executor semantics problem (`F_PROC`)
-
-### 4.3 Level 3 (Search & Control)
-
-| Metric | Type | Description |
-| --- | --- | --- |
-| `search.depth.max` | int | Max depth used |
-| `search.termination_margin` | float | Stop confidence margin |
-| `search.retry_count` | int | Number of retries |
-| `search.budget_pressure` | float | Learned budget saturation |
-
-Interpretation:
-
-- Early stop + low confidence → `F_SEARCH`
-- Excessive retries → masking upstream failures (flag)
-
-### 4.4 Level 4 (Memory)
-
-| Metric | Type | Description |
-| --- | --- | --- |
-| `mem.read.k` | int | Retrieved items |
-| `mem.read.similarity` | float | Avg similarity |
-| `mem.write.gate` | float | Write probability |
-| `mem.consolidation.action` | enum | `merge` / `new` / `ignore` |
-
-Interpretation:
-
-- High similarity but failure → stale memory (`F_MEM`)
-- Frequent writes → memory pollution risk
-
-### 4.5 Level 5 (Abstraction)
-
-| Metric | Type | Description |
-| --- | --- | --- |
-| `abs.macro.count` | int | Active macro tokens |
-| `abs.granularity` | float | Micro ↔ Macro scale |
-| `abs.override_rate` | float | Macro ignored downstream |
-
-Interpretation:
-
-- Macro present but ignored → underpowered abstraction
-- Macro dominates failures → over-abstraction (`F_ABS`)
-
-### 4.6 Level 6 (Verification & Calibration)
-
-| Metric | Type | Description |
-| --- | --- | --- |
-| `eval.false_accept_rate` | float | Invalid accepted |
-| `eval.false_reject_rate` | float | Valid rejected |
-| `eval.calibration_error` | float | ECE / similar |
-| `eval.disagreement` | float | Internal verifier variance |
-
-Interpretation:
-
-- High false accept → `F_EVAL` critical
-- High disagreement → unreliable credit routing
-
----
-
-## 5. Pretraining-Primary Process Metrics
-
-### 5.1 Primary Gate Signals (Pretraining-First)
-
-| Metric | Type | Gate Intent |
-| --- | --- | --- |
-| `failure.credit.collapse_rate` | float | Credit routing must not collapse |
-| `eval.calibration_error` | float | Calibration must not degrade |
-| `prog.diversity` | float | Program proposal diversity must persist |
-| `concept.leakage_score` | float | Concept leakage must not increase |
-| `paired.invariance.gap` | float | Paired invariance must not worsen |
-| `search.termination_margin` | float | Avoid failure-masking early stop |
-| `process.failure_distribution_entropy` | float | Keep failure diagnostics informative |
-| `rep.tokenizer.ir_fragmentation_rate` | float | Protected IR/control strings must remain atomic |
-
-### 5.2 Priority Rule
-
-If an update improves outcome metrics but worsens any primary gate signal, it is treated as **regression**.
-
----
-
-## 6. ConceptARC-Specific Metrics
-
-ConceptARC is treated as a **diagnostic instrument**, not a leaderboard.
-
-### 6.1 Per-Concept Bucket Metrics
-
-For each concept bucket:
+### 4.1 L0 / L1 Representation and Structuring
 
 | Metric | Description |
 | --- | --- |
-| `concept.success_rate` | Accuracy within bucket |
-| `concept.isolation_score` | Independence from other concepts |
-| `concept.leakage_score` | Performance degradation when mixed |
-| `concept.failure_profile` | Distribution over failure codes |
+| `rep.document.parse_completeness` | Fraction of required document structure successfully parsed |
+| `rep.symbol.binding_error_rate` | Symbol binding or scope error rate |
+| `rep.diagram.grounding_score` | Diagram-to-state grounding quality |
+| `rep.constraint.coverage` | Coverage of explicit mathematical constraints |
+| `rep.tokenizer.ir_fragmentation_rate` | Fragmentation of protected IR/control strings |
 
-Regression is defined as **worsening isolation or increased leakage**, even if global accuracy improves.
+### 4.2 L2 Strategy Induction
+
+| Metric | Description |
+| --- | --- |
+| `prog.diversity` | Diversity of strategy proposals or frontier expansions |
+| `proc.frontier.branch_quality` | Quality of frontier candidates |
+| `proc.strategy.consistency` | Stability of strategy family under small perturbations |
+
+### 4.3 L3 Search Control and Recovery
+
+| Metric | Description |
+| --- | --- |
+| `search.depth.max` | Maximum search / reasoning depth |
+| `search.budget_pressure` | Budget saturation signal |
+| `search.backtrack_rate` | Backtrack frequency |
+| `search.recovery_precision` | Fraction of recovery actions hitting the credited failure locus |
+| `search.termination_margin` | Margin between stop decision and uncertainty / failure risk |
+
+### 4.4 L4 Memory / Retrieval Binding
+
+| Metric | Description |
+| --- | --- |
+| `mem.read.similarity` | Retrieval similarity summary |
+| `mem.applicability_precision` | Fraction of retrieved items that pass applicability audit |
+| `mem.applicability_reject_rate` | Fraction explicitly rejected as unsafe |
+| `mem.write.gate` | Write probability or consolidation gate |
+
+### 4.5 L5 Abstraction / Compression
+
+| Metric | Description |
+| --- | --- |
+| `abs.granularity` | Micro-to-macro abstraction scale |
+| `abs.invariant.reuse_rate` | Reuse rate of abstraction outputs |
+| `abs.override_rate` | Fraction ignored or overridden downstream |
+
+### 4.6 L6 Verification and Diagnosis
+
+| Metric | Description |
+| --- | --- |
+| `eval.false_accept_rate` | Invalid solutions or proofs accepted |
+| `eval.false_reject_rate` | Valid solutions or proofs rejected |
+| `eval.calibration_error` | Calibration error |
+| `eval.counterexample_hit_rate` | Rate at which contradiction / counterexample probes succeed when failure exists |
+| `eval.disagreement` | Internal verification disagreement |
 
 ---
 
-## 7. Regression Output Schema (Vocabulary)
+## 5. Representation-Robustness and Concept Metrics
 
-Regression suite activation (`ON` / `OBSERVE` / `OFF`) and gate semantics are defined in `docs/06_Regression_and_Phase_Gates.md`.
-This section defines **only** the canonical output/logging fields.
+These metrics remain canonical during the transition:
 
-### 7.1 Gate Output Schema
+| Metric | Description |
+| --- | --- |
+| `paired.invariance.gap` | Performance gap across semantically equivalent reformulations |
+| `paired.asymmetry_rate` | One-sided success / failure rate for paired variants |
+| `concept.success_rate` | Per-concept success rate |
+| `concept.isolation_score` | Ability to use a concept without cross-concept interference |
+| `concept.leakage_score` | Leakage or interference under mixed conditions |
 
-```text
-regression.status = PASS | FAIL
-regression.violations = [
-  { metric, delta, phase, suspected_level }
-]
-```
-
-Rules:
-
-- `phase` MUST be one of `A|B|C|D|E` and MUST match the active run profile.
-- No silent passes are allowed: if a suite is executed, it must emit an explicit status record.
+Use these metrics for document variants, OCR variants, cross-modal variants, and homologous problem restatements, not only legacy ARC-style pairings.
 
 ---
 
-## 8. Logging and Storage Requirements
+## 6. Governance and Data Metrics
 
-- All metrics MUST be serializable (JSON/YAML).
-- Per-attempt logs MUST include:
-  - State ID
-  - Phase
-  - Dataset / tool source
-  - Full failure credit vector
-  - `segment_id` and `optimizer_step_id` (if segmented training is active)
-  - `dataset_slice_id` and `data_seed` (if replayable data path is active)
-  - `journal_status` (`PENDING|APPLIED`) and `journal_head_hash` (if segment journal is active)
-  - `rng_hash_pre` / `rng_hash_post` at segment boundary (if `S8` is active)
-  - `resume_path_id` (`uninterrupted|execute_crash|pre_commit_crash|post_commit_crash`) for `S8` runs
-- Run metadata MUST include (minimum):
-  - `baseline_id`
-  - `tolerance_profile_id`
-  - `runtime_lock_manifest_id`
-  - `runtime_lock_manifest_sha256`
-  - `code_version_hash`
-  - `config_hash`
-  - `tokenizer.vocab_size` (when text pipeline is active)
-- Aggregation MUST NOT discard tail failures.
+| Metric | Description |
+| --- | --- |
+| `contam.train_visible_overlap_rate` | Estimated overlap between train-visible material and held-out eval |
+| `contam.strict_holdout_leakage_score` | Leakage estimate against strict held-out sets |
+| `benchmark.tier1.weight` | Realized Tier 1 share |
+| `benchmark.tier2.generalization_gap` | Gap between train-visible-adjacent and train-hidden homologous eval |
+| `benchmark.tier3.frontier_success_rate` | Success rate on strict held-out frontier eval |
+| `provenance.parser_coverage` | Fraction of relevant examples with parser provenance |
+| `provenance.formalizer_coverage` | Fraction with formalizer provenance when applicable |
+| `provenance.verifier_coverage` | Fraction with verifier build provenance when applicable |
+
+---
+
+## 7. Primary Gate Signals
+
+These remain the highest-priority gate inputs:
+
+| Metric | Gate Intent |
+| --- | --- |
+| `failure.credit.collapse_rate` | Credit routing must not collapse |
+| `eval.calibration_error` | Calibration must not degrade |
+| `prog.diversity` | Strategy diversity must persist |
+| `search.termination_margin` | Avoid failure-masking early stop |
+| `process.failure_distribution_entropy` | Failure diagnostics must remain informative |
+| `rep.tokenizer.ir_fragmentation_rate` | Protected control strings must remain stable |
+| `contam.strict_holdout_leakage_score` | Strict held-out leakage must stay bounded |
+| `provenance.parser_coverage` | Parser provenance coverage must not silently disappear |
+
+If outcome improves while primary gate signals regress, the change is treated as a regression.
+
+---
+
+## 8. Logging and Metadata Requirements
+
+Per-attempt or per-segment logging must preserve:
+
+- `phase`
+- `baseline_id`
+- `tolerance_profile_id`
+- `failure.credit`
+- benchmark tier id where relevant
+- parser provenance id where relevant
+- formalizer version where relevant
+- verifier build id where relevant
+- dataset slice id / seed when replayable
+- resume path id when `S8` is active
+
+Aggregation must not discard tail failures.
 
 ---
 
 ## 9. Final Invariants
 
-- No metric may bypass Level identity.
-- No failure may be recorded without a taxonomy code.
-- No regression may be waived without explicit annotation.
-
-> If a behavior cannot be expressed in these metrics, it does not exist for the system.
+1. No metric may bypass level identity.
+2. No failed attempt may omit failure taxonomy.
+3. No governance-relevant data source may omit required provenance.
+4. No regression may be justified by benchmark score alone.

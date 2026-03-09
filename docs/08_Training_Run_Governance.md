@@ -1,52 +1,50 @@
 # Training Run Governance
 
-**Document Type:** Engineering Governance (Non-normative but Policy-Binding)  
-**Scope:** Segment transactions, exactly-once resume, reproducibility controls, runtime lock enforcement, and S8 drift diagnostics  
-**Related canonical docs:** `docs/06_Regression_and_Phase_Gates.md`, `docs/05_Eval_Metrics_Spec.md`, `docs/07_Data_Mixture_and_Ingestion.md`, `docs/09_Training_Profile_SingleH100_3B.md`  
-**Source lineage:** Consolidated from legacy training governance notes/specs (removed on 2026-02-27).
+**Document Type:** Engineering Governance (Policy-Binding)  
+**Scope:** Segment transactions, exactly-once resume, runtime lock, reproducibility controls, and provenance requirements for IRIS-math v2  
+**Related active docs:** `docs/05_Eval_Metrics_Spec.md`, `docs/06_Regression_and_Phase_Gates.md`, `docs/07_Data_Constitution.md`, `docs/09_Training_Profiles_and_Scaling.md`
 
 ---
 
 ## 0. Positioning and Authority
 
-- This document is policy-binding for training operations and reproducibility.
-- It does not override system invariants, State IR contracts, trunk contract, Level contracts, or the learnable-control contract.
-- Where a rule requires a hard cap (e.g., max wall-clock), it is a guardrail only. If it affects semantics, it must be explicitly labeled `TEMPORARY TECHNICAL DEBT` with a removal criterion and intended learned replacement path.
+- This document is policy-binding for training operations.
+- It does not override architecture, State IR, level, or credit-assignment contracts.
+- Benchmark handling in training must follow `docs/07_Data_Constitution.md`; this document governs execution semantics, not benchmark policy by itself.
 
 ---
 
 ## 1. Purpose
 
-Define run-time governance for long training:
+Define the run-time governance required for long mathematical training runs:
 
-- Segment transaction semantics
-- Exactly-once training progress (`no duplicate apply`, `no missed apply`)
-- Runtime lock compliance
-- Drift diagnosis and artifact requirements (especially `S8`)
+- segment transaction semantics,
+- exactly-once progress,
+- reproducibility and runtime lock control,
+- parser / formalizer / verifier provenance capture,
+- resume drift diagnosis.
 
 ---
 
-## 2. Pretraining-First Governance Priorities
+## 2. Governance Priorities
 
-Pretraining is optimized for stable internal behavior distributions:
+Training governance exists to preserve stable, attributable behavior distributions:
 
-- Failure taxonomy observability and stability
-- L6 credit routing quality (no collapse)
-- Calibration quality (no degradation)
-- Program diversity at L2
-- Recovery signal quality through the L3/L6 loop
+- failure-taxonomy observability,
+- credit-routing quality,
+- calibration quality,
+- strategy diversity,
+- contamination control,
+- provenance coverage,
+- resume consistency.
 
-Outcome and cost metrics are secondary probes:
+Outcome metrics and benchmark scores are secondary to these controls.
 
-- Task success / benchmark score
-- Cost and throughput
+Benchmark policy summary:
 
-Secondary improvement cannot justify regression in primary process signals (see `docs/05_Eval_Metrics_Spec.md` and `docs/06_Regression_and_Phase_Gates.md`).
-
-Benchmark boundaries:
-
-- Benchmark datasets are regression probes, not training mixture components (see `docs/07_Data_Mixture_and_Ingestion.md`).
-- Tools/benchmarks must not provide runtime truth authority, routing policy, or control decisions.
+- Tier 1 benchmark data may be train-visible only under the declared policy in `docs/07_Data_Constitution.md`.
+- Tier 2 and Tier 3 remain evaluation surfaces.
+- Governance must record which tier policy was active for the run.
 
 ---
 
@@ -58,9 +56,7 @@ An atomic training unit that groups a fixed data slice, its traces, and its metr
 **Segment Status**
 
 - `PENDING`: execute path completed, apply not committed
-- `APPLIED`: optimizer/state update committed
-
-A segment is either fully applied or not applied at all.
+- `APPLIED`: committed update
 
 **Micro Step**  
 One forward/backward pass on a microbatch.
@@ -70,48 +66,32 @@ One applied update after a full accumulation window.
 
 ---
 
-## 4. Segment Transaction Model (Execute / Apply)
+## 4. Segment Transaction Model
 
-### 4.1 Segment State Model
+### 4.1 Execute vs Apply
 
-- `PENDING`: execute completed, apply not committed.
-- `APPLIED`: model/optimizer/RNG and behavior-affecting state committed.
+**Execute** may consume compute and RNG but must not mutate committed global state.
 
-A segment is either fully applied or replayed.
+**Apply** commits:
 
-### 4.2 Execute vs Apply
+- model weights,
+- optimizer state,
+- behavior-affecting RNG,
+- behavior-affecting memory / macro state,
+- provenance identities relevant to the segment.
 
-**Execute (interruptible)**:
-
-- Forward/rollout/verifier/loss/grad accumulation
-- Consumes RNG
-- Must not mutate committed global training state
-
-**Apply (atomic intent)**:
-
-- Update model weights and optimizer state
-- Commit full RNG tree
-- Commit behavior-affecting memory/macro state
-
-### 4.3 Accumulation Boundary Rules
+### 4.2 Boundary Rules
 
 1. Accumulation windows must be fully contained inside a single segment.
 2. Cross-segment accumulation is forbidden.
-3. A segment boundary must align to optimizer-step boundary.
-4. Segment completion is recognized only after `APPLIED`.
-
-If interruption occurs before apply, the segment remains `PENDING` and must be replayed.
+3. Segment boundaries must align with optimizer-step boundaries.
+4. A segment counts as complete only after `APPLIED`.
 
 ---
 
 ## 5. Journal and Exactly-Once Rules
 
-Journal schema: `iris.segment_journal/v1` (append-only).
-
-Storage:
-
-- JSONL append-only file or append-only table
-- No in-place overwrite for status transitions
+Journal schema remains `iris.segment_journal/v1` and must stay append-only.
 
 ### 5.1 Minimum Journal Record Fields
 
@@ -119,63 +99,62 @@ Storage:
 | --- | --- | --- |
 | `schema` | string | `iris.segment_journal/v1` |
 | `event_id` | int | Monotonic per run |
-| `event_time` | string | ISO-8601 UTC |
 | `run_id` | string | Immutable run identity |
 | `segment_id` | int | Monotonic segment index |
 | `status` | enum | `PENDING` or `APPLIED` |
 | `optimizer_step_id` | int | Target optimizer step |
-| `dataset_slice_id` | string | Deterministic data window id |
-| `rng_hash_pre` | string | Hash of RNG tree at segment entry |
+| `dataset_slice_id` | string | Deterministic data-window id |
+| `rng_hash_pre` | string | Hash at segment entry |
 | `rng_hash_post` | string/null | Null for `PENDING`, required for `APPLIED` |
-| `loss_hash` | string | Hash of segment loss summary |
-| `grad_stats_hash` | string | Hash of grad summary for audit |
+| `loss_hash` | string | Loss-summary hash |
+| `grad_stats_hash` | string | Gradient-summary hash |
 | `code_version_hash` | string | Code provenance |
 | `config_hash` | string | Full config provenance |
 | `runtime_lock_manifest_sha256` | string | Runtime provenance |
+| `tier_policy_id` | string | Active benchmark/data-tier policy id |
+| `parser_provenance_id` | string/null | Required for document-derived or multimodal segments |
+| `ocr_layout_extractor_version` | string/null | Required when OCR/layout parsing is active |
+| `formalizer_version` | string/null | Required when natural-to-formal conversion is active |
+| `verifier_build_id` | string/null | Required when verifier-generated labels or checks are active |
 | `checkpoint_ref` | string/null | Required for `APPLIED` |
 
 ### 5.2 Authority Rules
 
-- Resume truth source is `last APPLIED event`.
-- `PENDING` indicates replay required.
-- Checkpoints without matching `APPLIED` event are quarantined as non-authoritative.
+- Resume truth source is the last `APPLIED` event.
+- `PENDING` means replay is required.
+- Checkpoints without a matching `APPLIED` event are non-authoritative.
 
 ---
 
 ## 6. Checkpoint Atomicity and Commit Order
 
-Checkpoint backend requirement:
+Commit protocol:
 
-- Orbax/TensorStore path must follow `temp write -> fsync -> atomic rename`
-
-Commit protocol (idempotent):
-
-1. Append `PENDING` journal event for `segment_id`
-2. Run `execute`
-3. Build `apply` candidate state in memory
-4. Write checkpoint to temp path (post-apply state)
+1. Append `PENDING` event
+2. Execute segment
+3. Build post-apply state in memory
+4. Write checkpoint to a temp path
 5. `fsync` checkpoint payload and metadata
-6. Atomic rename temp path to final checkpoint path
+6. Atomic rename to final path
 7. `fsync` parent directory metadata
-8. Append `APPLIED` journal event (same `segment_id`) with `checkpoint_ref`
+8. Append `APPLIED` event
 
-Resume reconciliation:
+### 6.1 Minimum Checkpoint Payload
 
-- If last journal status for newest segment is `PENDING`: replay segment, ignore newer uncommitted checkpoint artifacts
-- If last journal status is `APPLIED`: restore from referenced checkpoint
-- Stray checkpoints without matching `APPLIED` event are non-authoritative
-
-### 6.1 Minimum Checkpoint Payload (Required)
-
-- Model weights
-- Optimizer state
-- Full RNG tree
-- Behavior-affecting memory/macro stats
+- model weights
+- optimizer state
+- full RNG tree
+- behavior-affecting memory / macro stats
 - `segment_id_last_applied`
 - `optimizer_step_id_last_applied`
 - `dataset_slice_id_last_applied`
 - `runtime_lock_manifest_id`
 - `runtime_lock_manifest_sha256`
+- `tier_policy_id`
+- `parser_provenance_id`
+- `ocr_layout_extractor_version`
+- `formalizer_version`
+- `verifier_build_id`
 - `journal_head_event_id`
 - `journal_head_hash`
 - `code_version_hash`
@@ -189,25 +168,23 @@ RNG is committed state and must be checkpointed/restored exactly.
 
 Rules:
 
-- Global RNG write-back during `execute` is forbidden.
+- Global RNG write-back during execute is forbidden.
 - RNG tree hash pre/post must be journaled.
-- Resume must restore full RNG tree, not only a seed scalar.
+- Resume must restore full RNG state, not only a seed scalar.
 
-### 7.1 RNG Ownership Table (v1)
+Subsystem examples:
 
-| Subsystem | Key Path | Consumed In | Commit Rule |
-| --- | --- | --- | --- |
-| Model stochastic ops (dropout, etc.) | `rng.model.*` | `execute` | Promote post-key only on `APPLIED` |
-| Routing/gating sampling | `rng.control.*` | `execute` | Promote post-key only on `APPLIED` |
-| Data shuffle/sampling | `rng.data.*` | `execute` | Promote post-key only on `APPLIED` |
-| Synthetic task generation | `rng.synthetic.*` | `execute` | Promote post-key only on `APPLIED` |
-| Verifier perturbation/probes | `rng.verifier.*` | `execute` | Promote post-key only on `APPLIED` |
+- model stochastic ops,
+- routing/gating sampling,
+- data shuffle / sampling,
+- synthetic task generation,
+- verifier probes / perturbations.
 
 ---
 
-## 8. Data Slice Determinism Spec
+## 8. Data Slice Determinism
 
-Data must be replayable by identity, not by iterator position.
+Data must be replayable by identity, not iterator position.
 
 Required keys:
 
@@ -217,159 +194,64 @@ Required keys:
 - `dataset_slice_id`
 - `data_seed`
 
-Deterministic mapping rule:
+When the slice is document-derived or verifier-derived, the effective slice identity must also be stable with respect to:
 
-```text
-batch = SelectBatch(run_id, dataset_slice_id, segment_id, micro_step_idx, data_seed)
-```
-
-Operational constraints:
-
-- Segment definition binds a fixed data slice.
-- “next batch” semantics are invalid for resumable segments.
-- Shuffle must derive only from deterministic keys above.
-- `dataset_slice_id` and `data_seed` must be present in checkpoint metadata.
+- parser provenance,
+- OCR/layout extractor version,
+- formalizer version,
+- verifier build id.
 
 ---
 
 ## 9. Runtime Lock Policy
 
-Runtime lock manifest is required and pinned per validated set.
+Runtime lock manifests remain mandatory.
 
-### 9.1 Lock Surfaces
+Pinned surfaces must include:
 
-The following must be pinned as one tested set:
+- system / driver surface,
+- Python + framework surface,
+- compilation / XLA surface,
+- verifier build provenance when the verifier is part of training-time supervision,
+- parser / extractor build provenance when document parsing is part of the training data path.
 
-System / driver surface (must be recorded):
+### 9.1 Resume Validation Policy
 
-- GPU model
-- NVIDIA driver version
-- CUDA runtime version
-- cuDNN version (if present/used by runtime)
-- OS + kernel (or container image id)
-
-Python + JAX surface (must be pinned):
-
-- `python`
-- `jax`
-- `jaxlib` (CUDA-compatible build; record build tag/hash)
-- `flax` (NNX API)
-- `optax`
-- `orbax-checkpoint`
-- `numpy`
-
-Optional but recommended pins:
-
-- `ml_dtypes`
-- `tensorstore` (if checkpoint backend requires it)
-
-Compilation / XLA surface (must be recorded):
-
-- `XLA_FLAGS` (full string)
-- JAX/XLA env vars that can affect numerics/compilation (record full key/value pairs), e.g.:
-  - `JAX_ENABLE_X64`, `JAX_DEFAULT_MATMUL_PRECISION`, `JAX_DISABLE_JIT`
-  - `XLA_PYTHON_CLIENT_MEM_FRACTION`, `XLA_PYTHON_CLIENT_PREALLOCATE`
-
-### 9.2 Resume Validation Policy
-
-- `strict` (default): manifest id and sha must match active runtime lock
-- `unsafe_resume` (explicit): allowed only before Phase C baseline freeze; must be logged as technical debt artifact
-- Phase C+ baseline rule: `unsafe_resume` is disallowed
-
-### 9.3 Upgrade Policy
-
-- No ad-hoc package bump in active training runs.
-- Upgrade only as a full tested set (never single-package drift).
-- Phase C baseline freeze: **no upgrades** unless treated as a baseline rebuild with full activated-suite regression artifacts.
-- Resume from checkpoint requires manifest id+sha match; mismatch is rejected in Phase C+.
-
-### 9.4 Runtime Lock Manifest Format (v1, JSON)
-
-Store a single manifest artifact per validated stack. Minimum required fields:
-
-```json
-{
-  "schema": "iris.runtime_lock_manifest/v1",
-  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
-  "phase": "A|B|C|D|E",
-  "host": {
-    "os": "...",
-    "kernel": "...",
-    "gpu": "...",
-    "nvidia_driver": "...",
-    "cuda_runtime": "...",
-    "cudnn": "..."
-  },
-  "python": { "version": "...", "packages": [{ "name": "jax", "version": "...", "hash": "..." }] },
-  "jax": {
-    "jax": "...",
-    "jaxlib": "...",
-    "jaxlib_build": "...",
-    "xla_flags": "...",
-    "env": { "JAX_ENABLE_X64": "...", "JAX_DEFAULT_MATMUL_PRECISION": "..." }
-  }
-}
-```
-
-### 9.5 Checkpoint Metadata Requirement
-
-Every checkpoint must record:
-
-- `runtime_lock_manifest_id`
-- `runtime_lock_manifest_sha256`
-
-This is required for `S8` resume investigations and to prevent silent “same checkpoint, different runtime” drift.
+- `strict` is the default.
+- `unsafe_resume` is disallowed after the baseline freeze point defined by the active phase/profile policy.
 
 ---
 
 ## 10. S8 Resume Consistency Alignment
 
-When S8 is active, validate crash classes:
+When `S8` is active, validate crash classes:
 
-1. Crash during `execute` (before apply)
-2. Crash after `execute` and before checkpoint commit (`pre-commit`)
-3. Crash after checkpoint commit (`post-commit`) with journal reconciliation
+1. during execute,
+2. after execute and before checkpoint commit,
+3. after checkpoint commit with journal reconciliation.
 
-Segment-aligned comparisons should use:
+Resume artifacts must preserve:
 
-- `task.validity_score`
-- `task.confidence`
-- `failure.credit`
-
-S8 failure diagnosis must classify suspected source:
-
-- `runtime_drift`
-- `rng_drift`
-- `data_slice_drift`
-- `optimizer_state_drift`
-
-Cadence binding (profile-specific): follow `docs/09_Training_Profile_SingleH100_3B.md`.
+- data slice identity,
+- runtime lock identity,
+- parser/formalizer/verifier provenance identity where relevant.
 
 ---
 
 ## 11. Technical Debt Boundaries
 
-Allowed hard controls are guardrails only (for example max segment wall-clock, max recovery retries).
+Hard controls are allowed only as guardrails.
+Each such control must include:
 
-If a hard control is introduced, it must include:
-
-- `TEMPORARY TECHNICAL DEBT` label
-- Removal criterion
-- Intended learned replacement path
-
----
-
-## 12. 不確定 Items
-
-- 不確定: Some JAX/XLA ops may still show minor numeric variation across driver/XLA minor versions.
-- Mitigation: strict runtime lock manifest + fixed XLA/env surfaces + S8 drift gates.
-- Default policy: do not treat cross-manifest resume as valid baseline evidence.
+- `TEMPORARY TECHNICAL DEBT` label,
+- removal criterion,
+- intended learned replacement.
 
 ---
 
-## 13. Related Documents
+## 12. Related Documents
 
-- `docs/06_Regression_and_Phase_Gates.md`
 - `docs/05_Eval_Metrics_Spec.md`
-- `docs/07_Data_Mixture_and_Ingestion.md`
-- `docs/09_Training_Profile_SingleH100_3B.md`
+- `docs/06_Regression_and_Phase_Gates.md`
+- `docs/07_Data_Constitution.md`
+- `docs/09_Training_Profiles_and_Scaling.md`

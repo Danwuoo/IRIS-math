@@ -32,7 +32,10 @@ _S8_MONITORED_METRICS: Tuple[str, ...] = (
     "process.failure_distribution_entropy",
 )
 _MANDATORY_DOCS: Tuple[str, ...] = (
+    "docs/數學模型建議.md",
+    "docs/00_INDEX.md",
     "docs/10_Glossary_and_Normative_Status.md",
+    "docs/07_Data_Constitution.md",
     "docs/01_Architecture_Constitution.md",
     "docs/02_State_IR_Spec.md",
     "docs/03_Level_Contracts_L0-L6.md",
@@ -40,6 +43,7 @@ _MANDATORY_DOCS: Tuple[str, ...] = (
     "docs/05_Eval_Metrics_Spec.md",
     "docs/06_Regression_and_Phase_Gates.md",
     "docs/08_Training_Run_Governance.md",
+    "docs/09_Training_Profiles_and_Scaling.md",
 )
 
 
@@ -48,7 +52,7 @@ class GateContext:
     phase: str = "C"
     baseline_id: str = "toy-baseline"
     tolerance_profile_id: str = "toy-default"
-    change_class: str = "Targeted fix (Strict JAX gate hardening)"
+    change_class: str = "Capability expansion (IRIS-math v2 documentation-first transition)"
     mandatory_docs_consulted: Tuple[str, ...] = _MANDATORY_DOCS
 
 

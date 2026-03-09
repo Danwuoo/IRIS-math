@@ -1,352 +1,170 @@
 # Credit Assignment and Failure Recovery
 
 **Document Type:** Canonical Specification (Normative)  
-**Effective date:** 2026-02-27  
-**Replaces (removed on 2026-02-27):**
-- Credit Assignment & Failure Recovery Model
-
-(See `docs/00_INDEX.md` for the historical path mapping.)
-
-**Authority:** Defines canonical failure taxonomy, credit routing semantics, and recovery responsibility boundaries.
+**Effective date:** 2026-03-10  
+**Authority:** Defines canonical failure taxonomy, credit-routing semantics, and targeted recovery behavior for IRIS-math v2.
 
 ---
 
-## Credit Assignment & Failure Recovery Model
+## 1. Purpose and Scope
 
-*(Canonical Specification)*
+This document ensures that:
 
-This document defines how **credit, blame, and recovery responsibility** are assigned across Levels (L0–L6) in the system.
-It explicitly constrains **where learning pressure, adaptation, and retry logic must reside**, and forbids collapsing the hierarchy into end-to-end loss or opaque controller heuristics.
+1. failures are attributed to semantically meaningful levels,
+2. verification-driven recovery is targeted instead of blind rerun,
+3. learning pressure remains level-addressable,
+4. the first-round v2 migration keeps external `L0-L6` stable.
 
-This document is normative and non-optional.
+During the first-round v2 design:
 
+- `L3` absorbs recovery / repair policy responsibilities,
+- `L6` absorbs learning-signal routing responsibilities.
 
-
----
-
-### 1. Purpose and Scope
-
-The purpose of this document is to ensure that:
-
-1. **Failures are attributed to specific Levels with semantic meaning**, not merely to parameters.
-2. **Recovery actions modify the correct Level’s behavior**, rather than masking errors upstream or downstream.
-3. **Training signals respect the architectural decomposition**, preserving modularity and long-term scalability.
-4. **Control, retry, and adaptation decisions remain learnable**, not hard-coded.
-
-This document governs:
-
-* Online inference-time recovery behavior
-* Training-time credit assignment
-* Inter-Level responsibility boundaries
-
-It does **not** specify optimization algorithms, loss functions, or implementation details.
+No new external level ids are introduced in this round.
 
 ---
 
-### 2. Core Principles (Non-Negotiable)
+## 2. Core Principles
 
-#### 2.1 Semantic Credit, Not Gradient Convenience
+### 2.1 Semantic Credit, Not Gradient Convenience
 
-Credit assignment is defined in terms of **semantic failure modes**, not gradient flow convenience.
+Credit assignment is based on the meaning of the failure, not on whichever parameters are easiest to optimize.
 
-> A Level is responsible if the *meaning* of its output caused downstream failure,
-> even if upstream or downstream gradients could technically fix it.
+### 2.2 Top-Down Diagnosis
 
----
+Global failure is diagnosed from the verifier side and routed downward.
+Lower levels do not declare overall success on their own.
 
-#### 2.2 No End-to-End Collapse
+### 2.3 Recovery Is Targeted
 
-The system **must not** rely on a single end-to-end loss that freely adjusts all Levels simultaneously.
+The system must not respond to failure by defaulting to "rerun everything."
+Recovery must correspond to the suspected failure location.
 
-* Joint optimization is allowed only if **Level-specific attribution signals** are preserved.
-* Any training regime that removes Level identity is invalid.
+### 2.4 Recovery and Learning Remain Learned
 
----
-
-#### 2.3 Failure Recovery Is a First-Class Output
-
-Failure recovery decisions are **model outputs**, not engineering fallbacks.
-
-* “Retry,” “expand search,” “re-perceive,” etc. are **actions chosen by learned heads**.
-* Hard-coded retry policies are considered technical debt and must be explicitly marked as such; they may only act as guardrails, not routine policy.
+Recovery selection and learning-signal routing are model behaviors, not engineering-only fallbacks.
 
 ---
 
-### 3. Failure Taxonomy (Canonical)
+## 3. Canonical Failure Taxonomy
 
-All failures must be mapped into one or more of the following categories.
+The external failure codes remain stable.
 
-#### 3.1 Representation Failure (L0 / L1)
+| Code | Category | Primary Levels | v2 Interpretation |
+| --- | --- | --- | --- |
+| `F_REP` | Representation Failure | `L0/L1` | Parse, grounding, symbol binding, document-structure or constraint-structure failure |
+| `F_PROC` | Procedural Failure | `L2` | Strategy induction or frontier-construction failure |
+| `F_SEARCH` | Search / Recovery Failure | `L3` | Budget, branching, backtracking, repair-policy failure |
+| `F_MEM` | Memory Failure | `L4` | Retrieval or lemma-applicability failure |
+| `F_ABS` | Abstraction Failure | `L5` | Invariant, macro, or compression-granularity failure |
+| `F_EVAL` | Evaluation Failure | `L6` | Verification, calibration, or diagnosis failure |
 
-**Symptoms**
-
-* Missing, fragmented, or spurious objects
-* Incorrect relations or events
-* Inconsistent state across rollouts
-
-**Semantic Cause**
-
-* The State IR does not faithfully represent the task environment.
-
-**Primary Responsible Levels**
-
-* Level 0 (Objectization / Relation / Event induction)
-* Level 1 (Dynamics / State transition modeling)
+No new top-level failure codes are introduced in this round.
 
 ---
 
-#### 3.2 Procedural Failure (L2)
+## 4. Credit Routing Flow
 
-**Symptoms**
+### 4.1 Directionality
 
-* Programs that are syntactically valid but semantically wrong
-* Correct primitives composed in incorrect order
-* Search converges on locally coherent but globally incorrect procedures
+Canonical order:
 
-**Semantic Cause**
+1. `L6` evaluates outcome validity and local/global risk
+2. `L6` emits failure-credit distribution
+3. `L3` chooses targeted recovery policy
+4. credited levels are re-invoked or adjusted
 
-* Incorrect program induction, execution, or scoring.
+### 4.2 Failure Credit Vector
 
-**Primary Responsible Level**
+`L6` must emit:
 
-* Level 2 (Program Proposal, Executor, Scorer)
-
----
-
-#### 3.3 Search / Resource Allocation Failure (L3)
-
-**Symptoms**
-
-* Premature termination
-* Insufficient beam width or rollout depth
-* Excessive computation on low-value branches
-
-**Semantic Cause**
-
-* Poor allocation of computational budget or exploration depth.
-
-**Primary Responsible Level**
-
-* Level 3 (Budget Controller, Node Expansion, Termination)
-
----
-
-#### 3.4 Knowledge / Memory Failure (L4)
-
-**Symptoms**
-
-* Relevant prior programs or concepts not retrieved
-* Incorrect or outdated memory reused
-* Overwriting useful abstractions
-
-**Semantic Cause**
-
-* Retrieval, consolidation, or write-gating errors.
-
-**Primary Responsible Level**
-
-* Level 4 (Memory Read / Write / Consolidation)
-
----
-
-#### 3.5 Abstraction Failure (L5)
-
-**Symptoms**
-
-* Overly concrete reasoning when abstraction is needed
-* Over-general macros that erase critical distinctions
-
-**Semantic Cause**
-
-* Incorrect abstraction granularity or macro construction.
-
-**Primary Responsible Level**
-
-* Level 5 (Abstraction / Macro Management)
-
----
-
-#### 3.6 Evaluation / Diagnosis Failure (L6)
-
-**Symptoms**
-
-* Accepting invalid solutions
-* Rejecting valid solutions
-* Miscalibrated confidence leading to wrong termination decisions
-
-**Semantic Cause**
-
-* Faulty verification or meta-evaluation.
-
-**Primary Responsible Level**
-
-* Level 6 (Verifier, Confidence, Credit Router)
-
----
-
-### 4. Credit Assignment Flow (Canonical Direction)
-
-Credit assignment flows **top-down**, not bottom-up.
-
-#### 4.1 Directionality Rule
-
-1. **Level 6 diagnoses outcome validity**
-2. **Level 3 decides whether more effort is warranted**
-3. **Level 6 routes blame toward candidate Levels**
-4. **Target Levels adjust behavior or are re-invoked**
-
-Lower Levels **do not self-diagnose global failure**.
-
----
-
-#### 4.2 L6 Credit Router (Mandatory)
-
-Level 6 must output a **credit routing distribution**, not a hard decision:
-
-```
-C = { c0, c1, c2, c3, c4, c5 }
+```text
+failure.credit = {
+  L0: c0,
+  L1: c1,
+  L2: c2,
+  L3: c3,
+  L4: c4,
+  L5: c5,
+  L6: c6
+}
 ```
 
-Where:
+Constraints:
 
-* `ck ∈ [0,1]`
-* `Σ ck = 1`
-* Each `ck` represents the probability that Level `k` is responsible for failure
-
-This distribution is consumed by:
-
-* Level 3 (for recovery strategy selection)
-* Training pipelines (for loss routing)
-
-Level 6 must not emit direct computation-budget parameters; recovery scheduling and parameterization are Level 3 policy responsibilities.
+- `ck ∈ [0,1]`
+- `Σ ck = 1`
+- hard single-level blame is not the canonical output
 
 ---
 
-### 5. Failure Recovery Semantics (Inference-Time)
+## 5. Canonical Recovery Actions
 
-#### 5.1 Recovery Is Targeted, Not Global
+| Credited Level | Canonical Recovery Family |
+| --- | --- |
+| `L0` | reparse document regions, revisit OCR/layout grounding, re-anchor formulas or diagrams |
+| `L1` | rebuild symbol table, rescope assumptions, repair constraint graph |
+| `L2` | resample strategy families, reopen or rewrite the frontier |
+| `L3` | increase or reallocate budget, backtrack, switch strategy, choose targeted repair ordering |
+| `L4` | retrieve different lemmas/examples, tighten applicability checks, reject unsafe memory reuse |
+| `L5` | adjust abstraction granularity, re-expand compressed reasoning, revise invariants |
+| `L6` | re-verify, run stronger contradiction or counterexample probes, recalibrate confidence |
 
-When failure is detected:
-
-* The system **must not** blindly rerun the entire pipeline.
-* Recovery actions must correspond to the credited Level(s).
-
----
-
-#### 5.2 Canonical Recovery Actions by Level
-
-| Credited Level | Permitted Recovery Actions                                          |
-| -------------- | ------------------------------------------------------------------- |
-| L0             | Re-objectize, adjust segmentation thresholds, re-induce relations   |
-| L1             | Increase rollout depth, alter dynamics uncertainty handling         |
-| L2             | Expand program beam, resample proposals, alter executor temperature |
-| L3             | Increase budget, delay termination, rebalance exploration           |
-| L4             | Increase retrieval k, bypass consolidation, force fresh write       |
-| L5             | Change abstraction granularity, suppress macro usage                |
-| L6             | Re-verify with stricter criteria, recalibrate confidence            |
-
-This table defines permissible actions, not decision authority: Level 6 diagnoses and routes credit, while Level 3 selects and parameterizes recovery actions.
-
-Recovery actions must be **parameterized by learned heads**, even if bounded by hard limits.
+This table defines the allowed family of actions, not a hard-coded flowchart.
 
 ---
 
-#### 5.3 Multi-Level Failures
+## 6. Multi-Level Failures
 
-If credit is distributed across multiple Levels:
-
-* Recovery may be staged (e.g., L2 first, then L0)
-* Or parallel (e.g., re-perception + larger program beam)
-
-The ordering itself should be learnable via Level 3 policies.
-
----
-
-### 6. Training-Time Credit Assignment
-
-#### 6.1 Loss Routing Constraint
-
-Training losses must be **Level-addressable**.
-
-* Each loss term must declare which Level(s) it supervises.
-* Shared losses must expose attribution weights consistent with L6 credit routing.
-
----
-
-#### 6.2 Forbidden Training Patterns
-
-The following are explicitly forbidden:
-
-* Single scalar loss backpropagated uniformly to all Levels
-* Reinforcement learning signals that bypass Level identity
-* Controller-only training that treats other Levels as black boxes
-
----
-
-#### 6.3 Acceptable Patterns
-
-Allowed patterns include:
-
-* Multi-head losses with Level-specific targets
-* Hierarchical RL where rewards are decomposed per Level
-* Self-consistency losses gated by L6 diagnostic outputs
-
----
-
-### 7. Responsibility Boundaries (Hard Rules)
-
-#### 7.1 Lower Levels Cannot “Fix” Higher-Level Mistakes
+Multi-level credit is allowed and expected.
 
 Examples:
 
-* L0 must not learn to encode task solutions to compensate for bad L2 programs.
-* L1 must not hallucinate dynamics to rescue poor search decisions.
+- `F_REP + F_EVAL`: bad document grounding plus verifier overconfidence
+- `F_PROC + F_SEARCH`: weak strategy proposal plus poor branch allocation
+- `F_MEM + F_ABS`: retrieved lemma mismatch plus over-aggressive abstraction
+
+`L3` decides staged or parallel recovery order using learned policy.
 
 ---
 
-#### 7.2 Higher Levels Cannot Mask Lower-Level Errors
+## 7. Training-Time Credit Assignment
 
-Examples:
+Training losses must remain level-addressable.
 
-* L3 must not endlessly increase search depth to hide perception failures.
-* L6 must not lower verification thresholds to accept flawed solutions.
+Allowed patterns:
 
----
+- level-scoped supervision,
+- verifier-conditioned self-consistency signals,
+- decomposed reward or preference signals,
+- targeted replay or contrast training tied to `failure.credit`.
 
-### 8. Observable Signals Required (Minimum)
+Forbidden patterns:
 
-Each Level must expose **diagnostic signals** consumable by L6:
-
-* Confidence or uncertainty estimates
-* Entropy or dispersion measures
-* Self-consistency or disagreement indicators
-
-Opaque Levels that provide no introspectable signals are non-compliant.
+- opaque single-scalar blame,
+- controller-only optimization that treats all other levels as black boxes,
+- learning-signal routing that ignores level identity.
 
 ---
 
-### 9. Non-Goals (Explicit)
+## 8. Responsibility Boundaries
 
-This model explicitly does **not** aim to:
-
-* Produce human-readable explanations of credit assignment
-* Guarantee perfect blame isolation
-* Eliminate all heuristic bounds in early MVP stages
-
-However, any heuristic must be:
-
-* Explicitly labeled
-* Isolated
-* Designed to be replaced by learned behavior
+1. Lower levels must not encode hidden solutions to compensate for higher-level weakness.
+2. Higher levels must not mask lower-level defects by infinite retries or looser acceptance thresholds.
+3. Retrieval cannot stand in for reasoning without applicability audit.
+4. Verification cannot become a post-hoc excuse layer that accepts unsupported proofs.
 
 ---
 
-### 10. Summary (Normative)
+## 9. Observable Signals Required
 
-* Credit assignment is **semantic, hierarchical, and explicit**
-* Failure recovery is **targeted, learnable, and Level-aware**
-* Training must **preserve Level identity**
-* Any design that collapses these distinctions violates the architecture
+Every level must expose enough diagnostics for `L6` to reason about:
 
-This document is foundational.
-Any system variant that contradicts it is considered a different model.
+- uncertainty,
+- disagreement,
+- collapse indicators,
+- calibration,
+- recovery usefulness.
+
+Opaque levels are non-compliant.
+

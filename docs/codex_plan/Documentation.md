@@ -1,79 +1,83 @@
-# Documentation / Decisions Log (IRIS / Codex)
+# Documentation / Decisions Log (IRIS-math v2)
 
 **Document Type:** Design Note (Non-normative)  
-**Purpose:** Keep a durable record of decisions, assumptions (`不確定`), and per-change completion checklists for Codex runs  
-**Non-Override Clause:** This file does not override normative contracts.
+**Purpose:** Durable record of migration decisions, assumptions, and completion checklists
 
 ---
 
-## 0) Current Status (keep short)
+## 0. Current Status
 
 ```text
-current_phase: C
-current_milestone: M5 completed (Phase A->C skeleton baseline in place)
-next_action: expand mounted (non-stub) level implementations while preserving S1/S2 stability
+current_mode: documentation-first transition
+current_focus: v2 authority + contract rewrite completed
+next_action: align src State IR / metrics / regression implementation to active v2 docs
 ```
 
 ---
 
-## 1) Assumptions / Unknowns (label 不確定)
+## 1. Assumptions / Unknowns
 
 ```text
-- 不確定: JAX + Flax NNX GPU runtime is available in this Windows environment.
-  Evidence: local Python (3.10) does not currently have jax/flax installed; smoke runs used numpy backend.
-  Fallback: keep all smoke/structural/train checks runnable on CPU numpy path; use --device gpu command path as compatibility hook.
+- 不確定: the current src implementation still reflects baseline T/G/O/R/X/M-oriented scaffolding in several places.
+  Impact: docs are active truth; code-alignment work remains the next migration wave.
+
+- 不確定: legacy ARC-family probes may remain temporarily useful as archive compatibility signals.
+  Impact: allowed during transition, but insufficient alone for Phase D/E promotion evidence.
 ```
 
 ---
 
-## 2) Decision Records
+## 2. Decision Records
 
-## [2026-02-28] Decision: Build a contract-first Phase C baseline skeleton
+## [2026-03-10] Decision: move the repo to IRIS-math v2 authority
 
 Decision:
-- Implemented `src/iris/` skeleton covering State IR schema, L0-L6 interfaces/stubs, single trunk, canonical metrics helpers, and toy segmented training with resume journal.
+- Rewrote authority, navigation, data policy, profile policy, and v2 contracts so the active target is IRIS-math v2.
 
 Rationale:
-- Satisfies Phase C requirements in `docs/06_Regression_and_Phase_Gates.md` (interfaces present, attribution/logging live, structural checks runnable).
+- Baseline authority and baseline data policy were blocking the new direction.
 
-Alternatives considered:
-- Build only partial modules first. Rejected because it would leave Level interface and regression scaffolding incomplete.
+## [2026-03-10] Decision: keep external `L0-L6`, `F_*`, and `S1-S8` stable in round one
 
-Contract impact (docs/01..04):
-- Preserves single-trunk constraint.
-- Preserves canonical State IR token set `{T,G,O,R,X,M}` and order.
-- Keeps L0-L6 interfaces present with explicit stub behavior and diagnostics.
-- Uses learnable control logits from trunk outputs; no deterministic semantic scheduler introduced.
+Decision:
+- The first v2 rewrite changes semantics but not external numbering or suite ids.
 
-Workflow impact (docs/05..08):
-- Adds canonical metric-name logging stubs including `failure.credit`.
-- Adds S1/S2 scripts and minimal resume journal semantics (`PENDING`/`APPLIED`).
-- Keeps benchmark data out of training path (toy synthetic only).
+Rationale:
+- This limits transition blast radius while documents lead the implementation.
 
-Follow-ups:
-- Add richer mounted level implementations and regression artifacts for S3/S6/S7 when phase scope expands.
+## [2026-03-10] Decision: treat `docs/11` and `docs/12` as archive
+
+Decision:
+- They remain in the repo but are no longer active reading requirements.
+
+Rationale:
+- They describe baseline phase notes, not the active v2 target.
 
 ---
 
-## 3) Per-Change Completion Checklist (copy into PR / run notes)
+## 3. Per-Change Completion Checklist
 
 ```text
 Mandatory docs consulted:
+- docs/數學模型建議.md
+- docs/00_INDEX.md
 - docs/10_Glossary_and_Normative_Status.md
+- docs/07_Data_Constitution.md
 - docs/01_Architecture_Constitution.md
 - docs/02_State_IR_Spec.md
 - docs/03_Level_Contracts_L0-L6.md
 - docs/04_Credit_Assignment_and_Recovery.md
-Policy docs consulted (if applicable):
+
+Policy docs consulted:
 - docs/05_Eval_Metrics_Spec.md
 - docs/06_Regression_and_Phase_Gates.md
-- docs/07_Data_Mixture_and_Ingestion.md
 - docs/08_Training_Run_Governance.md
-- docs/09_Training_Profile_SingleH100_3B.md
+- docs/09_Training_Profiles_and_Scaling.md
 
 Change class: capability_expansion
-Expected failure-category / metric impact (use canonical names): improve attribution/readiness signals for F_REP, F_PROC, F_SEARCH, F_EVAL without benchmark-optimized claims
-Technical debt guardrails introduced (with removal criteria): none
-Regression status (what ran / what is expected to pass): pytest, S1 smoke, S2 structural, toy train/eval, crash+resume replay demonstration
+Expected failure-category impact: establishes v2 semantics while preserving stable external F_* / L0-L6 / S1-S8 surfaces
+Technical debt guardrails introduced: none in this documentation wave
+Benchmark contamination / provenance implications: tiering, decontamination, parser/formalizer/verifier provenance are now mandatory policy surfaces
+Regression status: targeted phase-gate regression checks required
 Termination: Done
 ```

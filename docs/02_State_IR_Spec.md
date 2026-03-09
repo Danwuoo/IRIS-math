@@ -1,655 +1,216 @@
 # State IR Spec
 
 **Document Type:** Canonical Specification (Normative)  
-**Effective date:** 2026-02-27  
-**Replaces (removed on 2026-02-27):**
-- State IR Canonical Spec
-- State IR Examples & Edge Cases
-
-(See `docs/00_INDEX.md` for the historical path mapping.)
-
-**Authority:** This document defines the closed State IR token type set and canonical ordering.
+**Effective date:** 2026-03-10  
+**Version:** 2.0  
+**Authority:** This document defines the active IRIS-math v2 State IR.
 
 ---
 
-## State IR Canonical Specification
+## 1. Purpose and Transition Scope
 
-**Version 1.0 (Normative)**
+State IR is the canonical internal work-state for IRIS-math v2.
 
-### 1. Purpose and Scope
+It exists to represent mathematical reasoning over:
 
-This document defines the **canonical State Intermediate Representation (State IR)** used across the entire system.
+- text,
+- documents,
+- formulas,
+- diagrams,
+- formal or semi-formal artifacts,
+- verifier feedback.
 
-State IR is the *only* shared representational substrate consumed and produced by the Trunk and all Levels (L0–L6).
-
-This specification exists to ensure:
-
-- Cross-Level composability without implicit assumptions
-- Architectural stability against uncontrolled token or modality expansion
-- Clear semantic contracts independent of tensor shapes or implementation details
-
-Any deviation from this specification constitutes an **architectural violation**, not an optimization.
-
----
-
-### 2. Core Principles (Non-Negotiable)
-
-1. **Single Canonical Representation**
-    
-    All internal reasoning state must be representable as State IR.
-    
-    No Level may introduce an alternative latent state space.
-    
-2. **Closed Token Type Set**
-    
-    The set of token types defined in this document is *closed*.
-    
-    New token types MAY NOT be added without a versioned revision of this spec.
-    
-3. **Uniform Trunk Processing**
-    
-    All State IR tokens are processed by the same Trunk without conditional routing at the representation level.
-    
-4. **Semantic, Not Procedural**
-    
-    State IR encodes *what the system believes the world/task/program state is*, not how it was produced.
-    
+The repository is in a documentation-first transition.
+During this period, baseline implementation may still expose legacy scaffolding.
+Such scaffolding is transitional and does not replace the v2 contract defined here.
 
 ---
 
-### 3. Token Type System
+## 2. Core Principles
 
-State IR consists of a fixed set of token categories.
+1. **Single Canonical Work State**  
+   All semantic reasoning state must map into this State IR.
 
-Each token is a vector in a shared latent space of dimension **d**.
+2. **Math-Native Semantics**  
+   State IR represents mathematical work structure, not generic conversation state.
 
-#### 3.1 Token Categories (Exhaustive)
+3. **Verifier Visibility**  
+   Verification and proof-validity signals are first-class parts of state.
 
-| Token Type | Symbol | Cardinality | Description |
+4. **Control Visibility**  
+   Strategy switching, backtracking, stopping, and budget state must be representable.
+
+5. **Cross-Modal Grounding**  
+   Text, document layout, formulas, and diagrams must normalize into one coherent state contract.
+
+6. **Versioned Evolution**  
+   Slot inventory, ordering, or mandatory semantics cannot drift silently.
+
+---
+
+## 3. Canonical Slot System
+
+State IR v2 uses seven fixed-order slot groups.
+
+| Slot | Symbol | Cardinality | Purpose |
 | --- | --- | --- | --- |
-| Task Token | T | 1 | Encodes the task-level intent, objective, and constraints |
-| Global Token | G | 1 | Aggregated global context and control-relevant state |
-| Object Tokens | O | Nₒ | Discrete entities or structured units in the world |
-| Relation Tokens | R | Nᵣ | Explicit relations between objects |
-| Event Tokens | X | Nₓ | State transitions, actions, or temporal changes |
-| Macro Tokens | M | Nₘ | Abstracted patterns, programs, or compressed histories |
+| Problem Frame | `PF` | exactly 1 | Task type, output form, assumptions, domain, source anchors |
+| Symbol Table | `SY` | `0..N_sy` | Variables, constants, functions, sets, types, scopes |
+| Constraint Graph | `CG` | `0..N_cg` | Equalities, inequalities, dependencies, incidences, recurrences |
+| Proof / Program Frontier | `FR` | `0..N_fr` | Hypotheses, subgoals, candidate strategies, branches, obligations |
+| Memory / Lemma Interface | `LM` | `0..N_lm` | Retrieved lemmas, match conditions, applicability audit, mismatch notes |
+| Verifier State | `VS` | `0..N_vs` | Local validity, gap risk, counterexample risk, consistency state |
+| Control State | `CS` | exactly 1 | Continue/backtrack/reparse/switch/stop intent, budget, escalation |
 
-No other token categories are permitted.
+No additional top-level slot groups are permitted.
 
 ---
 
-### 4. Canonical Sequence Construction
+## 4. Canonical Sequence Construction
 
-#### 4.1 Concatenation Order (Mandatory)
+The fixed slot order is:
 
-All State IR instances MUST be constructed using the following fixed order:
-
-```
-Z = [ T ; G ; O₁…Oₙ ; R₁…Rₖ ; X₁…Xₘ ; M₁…Mₚ ]
-
+```text
+Z = [ PF ; SY_1...SY_n ; CG_1...CG_m ; FR_1...FR_k ; LM_1...LM_p ; VS_1...VS_q ; CS ]
 ```
 
-Only the token categories defined in Section 3.1 may appear in `Z`. Program IR tokens are not State IR tokens and must never be concatenated into the canonical State IR sequence `Z`, even transiently.
+Rules:
 
-Where:
-
-- `T ∈ ℝ¹ˣᵈ`
-- `G ∈ ℝ¹ˣᵈ`
-- `O ∈ ℝᴺᵒˣᵈ`
-- `R ∈ ℝᴺʳˣᵈ`
-- `X ∈ ℝᴺˣˣᵈ`
-- `M ∈ ℝᴺᵐˣᵈ`
-
-Padding MAY be applied internally but MUST preserve relative ordering.
-
-#### 4.2 Ordering Stability
-
-- Relative ordering *within* each token group MUST be stable across a reasoning cycle.
-- Reordering tokens is considered a **state mutation** and must be explicitly produced by a learned module.
+- `PF` and `CS` must always be present.
+- `SY`, `CG`, `FR`, `LM`, and `VS` may be empty.
+- Relative ordering within each slot group must remain stable within a reasoning cycle.
+- Reordering inside a slot group is a state mutation and must be explicitly produced.
 
 ---
 
-### 5. Token Semantics
+## 5. Slot Semantics
 
-#### 5.1 Task Token (T)
+### 5.1 Problem Frame (`PF`)
 
-The Task Token represents:
+`PF` represents:
 
-- Task objective
-- Success criteria
-- Global constraints
-- Instructional priors
+- task type (`prove`, `compute`, `construct`, `decide`, `formalize`, `find_counterexample`, ...),
+- required output form,
+- assumptions currently in scope,
+- mathematical domain,
+- target object or target statement,
+- source anchors back to document/formula/diagram regions when available.
 
-It MUST be present at all times and MUST NOT be removed or replaced.
+### 5.2 Symbol Table (`SY`)
 
-#### 5.2 Global Token (G)
+`SY` stores:
 
-The Global Token serves as:
+- symbols,
+- domains / types,
+- scope boundaries,
+- bindings introduced by definitions or assumptions,
+- unresolved references.
 
-- Cross-token aggregation point
-- Control and routing context
-- Memory fusion anchor
+### 5.3 Constraint Graph (`CG`)
 
-Heads MAY preferentially read from or write to G, but MUST NOT assume exclusivity.
+`CG` stores:
 
-#### 5.3 Object Tokens (O)
+- equalities,
+- inequalities,
+- divisibility or modular relations,
+- implication or dependency edges,
+- geometric incidences,
+- recurrence or transformation relations.
 
-Object Tokens represent:
+### 5.4 Proof / Program Frontier (`FR`)
 
-- Discrete entities
-- Structured components
-- Symbolic units derived from perception or abstraction
+`FR` stores the active working frontier:
 
-They MUST be referentially stable within a reasoning cycle.
+- current hypotheses,
+- subgoals,
+- candidate strategy families,
+- active branch,
+- abandoned branch summaries,
+- unresolved obligations.
 
-#### 5.4 Relation Tokens (R)
+### 5.5 Memory / Lemma Interface (`LM`)
 
-Relation Tokens encode:
+`LM` stores:
 
-- Binary or higher-order relations between objects
-- Structural, spatial, or logical links
+- retrieved lemmas, patterns, or examples,
+- match conditions,
+- applicability confidence,
+- mismatch notes,
+- reasons a retrieved item is not yet safe to use.
 
-Relations MUST NOT be implicitly encoded solely via object embeddings.
+Similarity alone is insufficient; applicability audit is required.
 
-#### 5.5 Event Tokens (X)
+### 5.6 Verifier State (`VS`)
 
-Event Tokens represent:
+`VS` stores:
 
-- State transitions
-- Actions
-- Temporal deltas between states
+- local step-validity signals,
+- hidden-assumption risk,
+- proof-gap detection,
+- counterexample risk,
+- branch consistency summaries.
 
-They are the only token type permitted to carry explicit temporal semantics.
+### 5.7 Control State (`CS`)
 
-#### 5.6 Macro Tokens (M)
+`CS` stores:
 
-Macro Tokens represent:
-
-- Learned abstractions
-- Program fragments
-- Compressed multi-step patterns
-
-They MUST be treated as first-class tokens, not annotations.
-
----
-
-### 6. Mandatory Embeddings
-
-Every token in State IR MUST include the following additive embeddings:
-
-#### 6.1 Type Embedding (Required)
-
-A learned embedding indicating token category:
-
-- Task
-- Global
-- Object
-- Relation
-- Event
-- Macro
-
-Type embeddings are mandatory and MUST be consumed by the Trunk.
-
-#### 6.2 Structural Embedding (Conditional)
-
-Applied where applicable:
-
-- Object geometry or topology
-- Relation endpoints or arity
-- Program node roles (for Macro tokens)
-
-Absence of structure MUST be encoded explicitly, not omitted.
-
-#### 6.3 Temporal Embedding (Restricted)
-
-- Applied ONLY to Event Tokens and (optionally) Macro Tokens
-- MUST NOT be applied to Object or Relation Tokens
+- next-action mode (`continue`, `backtrack`, `reparse`, `switch_strategy`, `stop`, ...),
+- remaining budget,
+- uncertainty / escalation state,
+- recovery mode state when targeted repair is active.
 
 ---
 
-### 7. State IR Mutability Rules
+## 6. Cross-Modal Anchoring and External Artifact Normalization
 
-1. **Creation**
-    
-    New tokens MAY be created only by learned modules (e.g., L0, L2, L5).
-    
-2. **Deletion**
-    
-    Tokens MAY be dropped only via explicit learned gating or consolidation.
-    
-3. **Modification**
-    
-    Token content may change freely through Trunk processing and adapters.
-    
-4. **Persistence**
-    
-    Tokens persist across reasoning cycles unless explicitly removed.
-    
+Document parsers, OCR systems, formalizers, verifiers, and external tools do not write raw outputs directly into the trunk.
+
+They must first be normalized into:
+
+- canonical parse artifacts governed by `docs/07_Data_Constitution.md`,
+- State IR slot content governed by this document.
+
+State IR may retain **anchors** to source regions or provenance ids, but not raw unmanaged tool traces.
 
 ---
 
-### 8. Cross-Level Contract
+## 7. Mutability Rules
 
-All Levels (L0–L6):
-
-- MUST consume State IR as defined here
-- MUST produce State IR or scalar outputs derived from it
-- MUST NOT bypass State IR to exchange hidden states
-
-No Level may assume privileged access to pre- or post-Trunk representations.
+1. New slot entries may be created only by learned or contract-governed modules.
+2. Deletion or consolidation must be explicit.
+3. Control and verifier state are part of the same work-state contract, not out-of-band metadata.
+4. Transition adapters that project baseline code into v2 slots are temporary and must be labeled as such.
 
 ---
 
-### 9. Explicit Non-Goals
+## 8. Cross-Level Contract
 
-State IR is **not**:
+All levels `L0-L6`:
 
-- A human-readable program representation
-- A symbolic execution trace
-- A DSL or instruction sequence
-- A tool invocation log
+- must consume this State IR or a schema-faithful slice of it,
+- must produce updated State IR or scalar signals derived from it,
+- must not invent alternative semantic state channels,
+- must not bypass the slot ordering defined above.
 
-Any of the above must be *encoded into* State IR, not replace it.
+Program traces or symbolic artifacts may exist outside State IR as auxiliary objects, but any behavior-affecting summary must be represented back into `FR`, `LM`, `VS`, or `CS`.
 
 ---
 
-### 10. Versioning and Extension Policy
+## 9. Explicit Non-Goals
+
+State IR is not:
+
+- a raw OCR dump,
+- a raw tool log,
+- a benchmark-specific action schema,
+- a human-readable proof script requirement,
+- a generic assistant conversation buffer.
+
+---
+
+## 10. Versioning and Compliance
 
 - This specification is versioned.
-- Any change to token types, ordering, or mandatory embeddings requires a new major version.
-- Silent extensions or “temporary” token hacks are forbidden.
+- Any change to the seven slot groups, their order, or their mandatory semantics requires a major revision.
+- Silent fallback to baseline `T/G/O/R/X/M` semantics is not compliant with the active target, even if temporary adapters still exist in code.
 
----
-
-### 11. Compliance Requirement
-
-Any model, agent, or training procedure claiming compatibility with this architecture MUST:
-
-- Accept this State IR verbatim
-- Reject undefined token types
-- Preserve ordering and semantics as specified
-
-Non-compliance is considered a **system-level defect**, not a performance trade-off.
-
----
-
-**End of Document**
-
----
-
-## **State IR Examples & Edge Cases**
-
-**(Normative Companion to “State IR Canonical Spec”)**
-
-This document provides concrete examples, pathological cases, and explicit boundary conditions for the **State IR** used across all Levels and the Single Trunk.
-Its purpose is to prevent silent drift, implicit token invention, or heuristic shortcuts by agents or future contributors.
-
-This document is **normative**: if an example here contradicts an implementation, the implementation is incorrect.
-
-This document is written to be read *after* **State IR Canonical Spec** and *before* any Level-specific contract.
-
----
-
-### 1. Scope and Non-Goals
-
-#### 1.1 Scope
-
-This document covers:
-
-* Canonical **example instantiations** of State IR
-* **Edge cases** that commonly induce architectural violations
-* Explicitly **forbidden interpretations**
-* Clarifications on **absence, emptiness, truncation, and overflow**
-
-#### 1.2 Non-Goals
-
-This document does **not**:
-
-* Define training procedures
-* Specify loss functions
-* Introduce new token types
-* Redefine State IR semantics
-
----
-
-### 2. Canonical Reminder: Fixed Token Inventory
-
-All examples in this document use the **fixed token inventory**:
-
-```
-Z = [ T ; G ; O₁…Oₙ ; R₁…Rₘ ; X₁…Xₖ ; M₁…Mₚ ]
-```
-
-Where:
-
-* `T` : Task token (exactly 1)
-* `G` : Global token (exactly 1)
-* `O` : Object tokens (0 ≤ n ≤ N_o)
-* `R` : Relation tokens (0 ≤ m ≤ N_r)
-* `X` : Event tokens (0 ≤ k ≤ N_x)
-* `M` : Macro tokens (0 ≤ p ≤ N_m)
-
-**Invariant**:
-Token *types* are fixed. Token *counts* may vary, but ordering and presence slots are stable.
-
-No example in this document introduces any additional token category.
-
----
-
-### 3. Example 1: Minimal Static Task (Degenerate Case)
-
-#### 3.1 Scenario
-
-A trivial task with:
-
-* No objects
-* No relations
-* No events
-* No macros
-
-Example: “Output a constant symbol regardless of input.”
-
-#### 3.2 State IR Instantiation
-
-```
-Z = [
-  T,
-  G,
-  ∅ O,
-  ∅ R,
-  ∅ X,
-  ∅ M
-]
-```
-
-#### 3.3 Key Properties
-
-* Object, Relation, Event, and Macro sections are **empty**, not removed.
-* Trunk input length is still ≥ 2.
-* Type embeddings are still applied to `T` and `G`.
-
-#### 3.4 Explicit Edge Rule
-
-**Absence is represented by empty sections, never by deleting token classes.**
-
-If an implementation removes the Object segment entirely, it is invalid.
-
----
-
-### 4. Example 2: Simple Object-Only Perception Task
-
-#### 4.1 Scenario
-
-Perceptual input yields objects but no relations or events.
-
-Example: detecting isolated shapes without spatial relationships.
-
-#### 4.2 State IR Instantiation
-
-```
-Z = [
-  T,
-  G,
-  O₁, O₂, O₃,
-  ∅ R,
-  ∅ X,
-  ∅ M
-]
-```
-
-#### 4.3 Clarifications
-
-* Object tokens **must not** encode relations implicitly.
-* “Nearest neighbor”, “alignment”, or “containment” must **not** be smuggled into object embeddings.
-
-#### 4.4 Forbidden Shortcut
-
-Encoding relational structure inside object embeddings to avoid `R` tokens is forbidden.
-
----
-
-### 5. Example 3: Object + Relation Graph (No Events)
-
-#### 5.1 Scenario
-
-A static structured scene.
-
-Example: a grid or graph with stable relationships.
-
-#### 5.2 State IR Instantiation
-
-```
-Z = [
-  T,
-  G,
-  O₁…Oₙ,
-  R₁…Rₘ,
-  ∅ X,
-  ∅ M
-]
-```
-
-#### 5.3 Relation Token Semantics
-
-Each `Rᵢ` represents:
-
-* A learned relation embedding
-* Soft references to participating objects (via learned attention or indices)
-* No hard-coded symbolic edges
-
-#### 5.4 Edge Case: Dense Relations
-
-If `m > N_r`:
-
-* Relations are **truncated**, not merged.
-* Truncation policy must be learned or deterministic, but **documented**.
-* Overflow must **not** create additional token types.
-
----
-
-### 6. Example 4: Eventful Transition (Single Step)
-
-#### 6.1 Scenario
-
-A before/after change in state.
-
-Example: applying a transformation once.
-
-#### 6.2 State IR Instantiation
-
-```
-Z = [
-  T,
-  G,
-  O₁…Oₙ,
-  R₁…Rₘ,
-  X₁,
-  ∅ M
-]
-```
-
-#### 6.3 Event Token Semantics
-
-An Event token:
-
-* Represents *change*, not state
-* May encode:
-
-  * Δobject attributes
-  * Δrelations
-  * Action-conditioned effects
-
-#### 6.4 Explicit Rule
-
-Events do **not** replace objects or relations.
-They coexist and contextualize them.
-
----
-
-### 7. Example 5: Multi-Step Rollout with Events
-
-#### 7.1 Scenario
-
-Sequential reasoning or rollout over time.
-
-#### 7.2 State IR Instantiation
-
-```
-Z = [
-  T,
-  G,
-  O₁…Oₙ,
-  R₁…Rₘ,
-  X₁, X₂, X₃,
-  ∅ M
-]
-```
-
-#### 7.3 Time Encoding
-
-* Only `X` tokens receive **time embeddings**
-* Objects and relations remain time-invariant unless updated via events
-
-#### 7.4 Edge Case: Event Overflow
-
-If `k > N_x`:
-
-* Older events are dropped or compressed
-* Objects must **not** absorb temporal history to compensate
-
----
-
-### 8. Example 6: Macro Abstraction Present
-
-#### 8.1 Scenario
-
-Repeated patterns summarized into abstractions.
-
-#### 8.2 State IR Instantiation
-
-```
-Z = [
-  T,
-  G,
-  O₁…Oₙ,
-  R₁…Rₘ,
-  X₁…Xₖ,
-  M₁, M₂
-]
-```
-
-#### 8.3 Macro Semantics
-
-Macro tokens:
-
-* Summarize repeated object/event structures
-* Are **not executable programs**
-* Are **not control tokens**
-
-#### 8.4 Forbidden Interpretation
-
-Macros must not act as:
-
-* Hard subroutines
-* If/else controllers
-* DSL instructions
-
-They are representational, not imperative.
-
----
-
-### 9. Example 7: Program Execution Does NOT Modify Token Inventory
-
-#### 9.1 Scenario
-
-A program proposal and execution step at Level 2.
-
-#### 9.2 Correct Behavior
-
-* Program IR exists **outside** State IR
-* Execution produces:
-
-  * Updated embeddings of existing tokens, or
-  * New *values* routed via fusion
-
-#### 9.3 Forbidden Behavior
-
-* Injecting “Program tokens” into `Z`
-* Temporarily expanding State IR schema
-
-State IR is **structurally immutable**.
-
----
-
-### 10. Null, Padding, and Masking Semantics
-
-#### 10.1 Padding
-
-* Padding is positional and masked
-* Padding tokens still have a **type**
-* Padding must not be overloaded as “null logic”
-
-#### 10.2 Null Meaning
-
-There is **no null token** in State IR.
-
-Absence is expressed by:
-
-* Zero count in that token segment
-* Not by sentinel embeddings
-
----
-
-### 11. Cross-Level Consistency Constraints
-
-#### 11.1 All Levels See the Same Z
-
-* Level 0–6 operate on the **same schema**
-* No Level may reinterpret token meaning
-
-#### 11.2 Learned Routing Does Not Alter Schema
-
-Gating or routing:
-
-* May scale contributions
-* May skip computation
-* Must not remove token types
-
----
-
-### 12. Common Failure Modes (Explicitly Disallowed)
-
-| Failure Mode                         | Why It Is Invalid             |
-| ------------------------------------ | ----------------------------- |
-| Folding relations into objects       | Breaks IR factorization       |
-| Using macros as programs             | Violates abstraction boundary |
-| Encoding control flow in token order | Router ≠ if-else              |
-| Adding temporary tokens              | Schema drift                  |
-| Removing unused token types          | Breaks trunk contract         |
-
----
-
-### 13. Compliance Checklist
-
-An implementation is **State IR compliant** iff:
-
-* Token inventory exactly matches the canonical set
-* Empty segments remain present as empty
-* No Level introduces or deletes token types
-* All “logic” beyond representation lives in weights
-
----
-
-### 14. Relationship to Other Documents
-
-* Depends on: **State IR Canonical Spec**
-* Constrains: **All Level Contracts**
-* Enforced by: **Core Invariants & Non-Negotiables**
-* Assumed by: **Single Trunk Contract**
-
----
-
-### 15. Final Normative Statement
-
-> **State IR is a representational contract, not a convenience layer.**
-> Any optimization that alters its structure is a system violation, even if task performance improves.

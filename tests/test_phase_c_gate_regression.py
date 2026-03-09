@@ -61,6 +61,17 @@ def test_build_concept_breakdown_from_minimal_conceptarc(tmp_path: Path) -> None
     assert report["concepts"][0]["concept_id"] == "Copy"
 
 
+def test_gate_context_uses_v2_mandatory_docs_sequence() -> None:
+    docs = GateContext().mandatory_docs_consulted
+    assert docs[:4] == (
+        "docs/數學模型建議.md",
+        "docs/00_INDEX.md",
+        "docs/10_Glossary_and_Normative_Status.md",
+        "docs/07_Data_Constitution.md",
+    )
+    assert docs[-1] == "docs/09_Training_Profiles_and_Scaling.md"
+
+
 def test_build_paired_representation_diff_from_minimal_rearc(tmp_path: Path) -> None:
     tasks = tmp_path / "tasks"
     _write_json(
