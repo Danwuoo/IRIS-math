@@ -4,6 +4,11 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
+
+pytest.importorskip("jax")
+pytest.importorskip("flax")
+pytest.importorskip("optax")
 
 from iris.arc import ArcEvalConfig, ArcExample, ArcTask, encode_arc_case_to_state, run_arc_diagnostic_eval
 from iris.schema import STATE_IR_TOKEN_ORDER
@@ -83,8 +88,8 @@ def test_encode_arc_case_to_state_uses_canonical_token_order() -> None:
     state = encode_arc_case_to_state(task=task, test_example=task.test_examples[0], hidden_dim=8)
     lengths = state.section_lengths()
     assert tuple(lengths.keys()) == STATE_IR_TOKEN_ORDER
-    assert state.T.shape[0] == 1
-    assert state.G.shape[0] == 1
+    assert lengths["PF"] == 1
+    assert lengths["CS"] == 1
     assert state.to_canonical_sequence().shape[1] == 8
 
 

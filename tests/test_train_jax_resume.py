@@ -10,6 +10,7 @@ pytest.importorskip("flax")
 pytest.importorskip("optax")
 
 from iris.train import ToyTrainConfig, run_toy_training
+from iris.train.checkpoint import load_checkpoint
 from iris.train.journal import load_journal
 
 
@@ -71,6 +72,13 @@ def test_pre_commit_crash_resume_keeps_single_applied_event(tmp_path: Path) -> N
     runtime_manifest = json.loads((output_dir / "runtime_lock_manifest.json").read_text(encoding="utf-8"))
     assert runtime_manifest["schema"] == "iris.runtime_lock_manifest/v1"
     assert "created_at" in runtime_manifest
+    applied_event = applied_segment0[0]
+    assert applied_event["policy_bundle_sha256"]
+    assert applied_event["data_realization_policy_id"] == "p1-bootstrap-b-v2"
+    assert applied_event["decontam_policy_id"] == "global-decontam-v2"
+    assert applied_event["parser_provenance_id"] == "math-doc-pipeline-v1"
+    assert applied_event["formalizer_provenance_id"] == "formalizer-skeleton-v1"
+    assert applied_event["verifier_provenance_id"] == "verifier-stack-v1"
 
     metrics_rows = (output_dir / "metrics.jsonl").read_text(encoding="utf-8").strip().splitlines()
     assert metrics_rows
@@ -79,6 +87,19 @@ def test_pre_commit_crash_resume_keeps_single_applied_event(tmp_path: Path) -> N
     assert metrics_record["runtime_lock_manifest_sha256"]
     assert metrics_record["code_version_hash"]
     assert metrics_record["config_hash"]
+    assert metrics_record["policy_bundle_sha256"]
+    assert metrics_record["data_realization_policy_id"] == "p1-bootstrap-b-v2"
+    assert metrics_record["parser_provenance_refs"]["semantic_unit_typer_manifest_id"] == "semantic-unit-typer-v1"
+
+    checkpoint = load_checkpoint(Path(applied_event["checkpoint_ref"]))
+    assert checkpoint["schema"] == "iris.training_checkpoint/v2"
+    assert checkpoint["policy_bundle_sha256"] == applied_event["policy_bundle_sha256"]
+    assert checkpoint["profile_id"] == "P1"
+    assert checkpoint["phase"] == "C"
+    assert checkpoint["data_realization_policy_id"] == "p1-bootstrap-b-v2"
+    assert checkpoint["parser_provenance_id"] == "math-doc-pipeline-v1"
+    assert checkpoint["formalizer_provenance_id"] == "formalizer-skeleton-v1"
+    assert checkpoint["verifier_provenance_id"] == "verifier-stack-v1"
 
 
 def test_runtime_lock_manifest_can_be_pinned_across_runs(tmp_path: Path) -> None:
@@ -114,3 +135,5 @@ def test_runtime_lock_manifest_can_be_pinned_across_runs(tmp_path: Path) -> None
     metrics_b = json.loads((output_b / "metrics.jsonl").read_text(encoding="utf-8").strip().splitlines()[-1])
     assert metrics_a["runtime_lock_manifest_id"] == metrics_b["runtime_lock_manifest_id"]
     assert metrics_a["runtime_lock_manifest_sha256"] == metrics_b["runtime_lock_manifest_sha256"]
+    assert metrics_a["policy_bundle_sha256"] == metrics_b["policy_bundle_sha256"]
+    assert metrics_a["data_realization_policy_id"] == metrics_b["data_realization_policy_id"]

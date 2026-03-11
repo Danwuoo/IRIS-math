@@ -4,7 +4,22 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from ...schema import StateIR
+from ...schema import (
+    ApplicabilityAudit,
+    Branch,
+    BudgetState,
+    ConstraintRelation,
+    ControlAction,
+    ControlState,
+    LemmaBinding,
+    ProblemFrame,
+    RequiredOutput,
+    ScopeRef,
+    StateIR,
+    StrategyCandidate,
+    Subgoal,
+    SymbolEntry,
+)
 
 
 def _token_vector(token_id: int, hidden_dim: int) -> np.ndarray:
@@ -71,11 +86,117 @@ def text_to_state_ir(
 
     m_section = np.mean(embeddings, axis=0, keepdims=True).astype(np.float32)
 
+    problem_scope = ScopeRef(scope_kind="problem_global", scope_id="scope-problem")
+    branch_scope = ScopeRef(
+        scope_kind="branch_local",
+        scope_id="branch-0",
+        parent_scope_id=problem_scope.scope_id,
+    )
+
+    symbols = tuple(
+        SymbolEntry(
+            sy_id=f"sy-{index}",
+            surface_form=f"sym_{index}",
+            entity_kind="symbol",
+            scope_ref=problem_scope,
+            binding_state="unresolved",
+            type_status="unknown",
+            vector=row,
+        )
+        for index, row in enumerate(o_section)
+    )
+    constraints = tuple(
+        ConstraintRelation(
+            cg_id=f"cg-{index}",
+            relation_type="dependency",
+            arguments=(f"chunk_{index}", f"chunk_{index + 1}"),
+            relation_status="candidate",
+            vector=row,
+        )
+        for index, row in enumerate(r_section)
+    )
+
+    frontier = [
+        Branch(
+            branch_id="branch-0",
+            branch_status="active",
+            local_scope_ref=branch_scope,
+            strategy_family="text_structuring",
+            summary="bootstrap frontier branch",
+            vector=(x_section[0] if x_section.shape[0] > 0 else g_section[0]),
+        )
+    ]
+    for index, row in enumerate(x_section):
+        frontier.append(
+            Subgoal(
+                subgoal_id=f"subgoal-{index}",
+                branch_id="branch-0",
+                goal_kind="interpret_segment",
+                target_payload=f"segment_{index}",
+                goal_status="candidate",
+                vector=row,
+            )
+        )
+    if not x_section.shape[0]:
+        frontier.append(
+            StrategyCandidate(
+                strategy_id="strategy-0",
+                branch_id="branch-0",
+                strategy_family="fallback_parse",
+                candidate_status="candidate",
+                score=0.0,
+                vector=g_section[0],
+            )
+        )
+
+    memory = tuple(
+        LemmaBinding(
+            lm_id="lm-0",
+            memory_kind="pattern",
+            source_ref="text_builder",
+            claim_signature="chunk_mean_pattern",
+            binding_map={},
+            applicability_audit=ApplicabilityAudit(
+                audit_status="unchecked",
+                required_conditions=(),
+            ),
+            retrieval_signal=0.0,
+            vector=m_section[0],
+        )
+        for _ in range(1 if m_section.shape[0] > 0 else 0)
+    )
+
     return StateIR(
-        T=t_section,
-        G=g_section,
-        O=o_section,
-        R=r_section,
-        X=x_section,
-        M=m_section,
+        PF=ProblemFrame(
+            task_type="interpret",
+            target_spec=f"text_len:{len(text)}",
+            required_output=RequiredOutput(
+                output_kind="structured_state",
+                answer_channel="structured_object",
+                formality_level="informal",
+            ),
+            problem_assumptions=(),
+            domain_tags=("text",),
+            source_anchor_refs=(),
+            frame_status="active",
+            vector=t_section[0],
+        ),
+        SY=symbols,
+        CG=constraints,
+        FR=tuple(frontier),
+        LM=memory,
+        VS=(),
+        CS=ControlState(
+            selected_action=ControlAction(
+                action_id="action-continue",
+                action_type="continue",
+                action_status="selected",
+            ),
+            budget_state=BudgetState(
+                global_step_budget_remaining=max(int(max_input_tokens) - len(token_ids), 0)
+            ),
+            uncertainty_state="estimated",
+            escalation_state="inactive",
+            vector=g_section[0],
+        ),
     )

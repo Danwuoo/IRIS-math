@@ -11,6 +11,17 @@
 The external numbering remains `L0-L6` during the first-round v2 migration.
 The responsibility semantics are math-specific.
 
+### Internal Module Mounting Rule
+
+`L7 Recovery / Repair` and `L8 Learning Signal Router` are not active external levels in v2.
+If these labels survive in code or design discussion, they may exist only as internal implementation names mounted under `L3` or `L6`.
+
+Rules:
+
+- internal modules may be separate code modules, parameter heads, or fused subgraphs,
+- internal modules must not introduce new external level ids, new top-level failure codes, or independent State IR bypass paths,
+- compliance, metrics, and regression gates still attach to the owning external level.
+
 ### Inputs
 
 - `state_in`: canonical State IR or a schema-faithful slice
@@ -23,6 +34,24 @@ The responsibility semantics are math-specific.
 - `state_out`: updated State IR
 - `control_out`: learned downstream suggestions or neutral control
 - `diagnostics`: level-observable signals for attribution, calibration, and regression
+
+### Mounted vs Stub Classification
+
+A level counts as `mounted` only when all of the following hold:
+
+- it consumes canonical State IR or a schema-faithful slice,
+- it produces non-neutral behavior on the level's contract-bearing surfaces,
+- it emits diagnostics that expose what it acted on and what it produced,
+- its behavior is attributable in regression as that level rather than as generic passthrough plumbing.
+
+A level counts as a `stub` when any of the following are true:
+
+- it only preserves the interface shape,
+- it emits neutral control only,
+- it does not exercise the level's contract-bearing sub-responsibilities,
+- it cannot support meaningful level-addressable attribution.
+
+Temporary partial implementations may report `implementation_status = partial_mount` in diagnostics, but for compliance and gate purposes they still count as `stub` until the level's required mounted surfaces are all live.
 
 ### Stub Behavior
 
@@ -41,6 +70,13 @@ Each level must expose diagnostics sufficient for:
 - calibration,
 - regression comparison,
 - stub-vs-mounted distinction.
+
+Minimum diagnostic granularity:
+
+- level summary: `implementation_status`, invocation outcome, and high-level target summary,
+- emitted object refs: affected `state_ref`, `branch_id`, `subgoal_id`, `vs_id`, or equivalent ids when applicable,
+- evidence / trigger refs: verifier or retrieval refs that materially influenced the decision when applicable,
+- internal-head status for composite levels, especially `L3` and `L6`.
 
 ---
 
@@ -114,12 +150,29 @@ Responsibilities:
 - perform targeted recovery and repair policy in the first-round v2 design,
 - decide whether more effort is warranted.
 
+Mounted implementation rule:
+
+`L3` must be semantically decomposable into these internal control heads:
+
+- `branch_controller`: chooses branch, subgoal, and strategy-transition behavior,
+- `budget_allocator`: assigns or reallocates search, verifier, and reparse budget,
+- `repair_scheduler`: orders targeted repair actions against the credited failure loci.
+
+These heads may be implemented as separate internal modules or as one fused learned block, but mounted `L3` diagnostics must expose their outputs separately enough for attribution.
+
 Typical diagnostics:
 
 - budget pressure,
 - backtrack rate,
 - recovery precision,
 - termination margin.
+
+Attribution-supporting diagnostics must also identify:
+
+- selected branch / subgoal or stop target,
+- budget change or saturation summary,
+- recovery target level or locus,
+- whether the action came from ordinary expansion, backtrack, or targeted repair scheduling.
 
 Prohibited patterns:
 
@@ -175,12 +228,29 @@ Responsibilities:
 - output failure taxonomy and level credit routing,
 - package learning-signal routing in the first-round v2 design.
 
+Mounted implementation rule:
+
+`L6` must be semantically decomposable into these internal diagnostic heads:
+
+- `verifier_aggregator`: aggregates evidence classes into validity and risk summaries,
+- `credit_router`: emits `failure.credit`, failure taxonomy support, and suspected failure loci,
+- `calibration_head`: emits calibrated confidence, abstention margin, and false-accept / false-reject risk summaries.
+
+These heads may be implemented as separate internal modules or as one fused learned block, but mounted `L6` diagnostics must expose their outputs separately enough for attribution.
+
 Typical diagnostics:
 
 - false accept / false reject rates,
 - calibration error,
 - disagreement,
 - failure-credit distribution.
+
+Attribution-supporting diagnostics must also identify:
+
+- supporting verifier evidence classes and refs,
+- whether credit routing is multi-level or near-collapsed,
+- calibration state for the accepted or rejected outcome,
+- which evidence changed the downstream recovery recommendation.
 
 Prohibited patterns:
 
@@ -197,3 +267,5 @@ Prohibited patterns:
 4. Has deterministic control replaced learned policy?
 5. Has L3 absorbed recovery policy without deleting the external `L0-L6` numbering?
 6. Has L6 retained verification plus credit routing without inventing new external levels?
+7. Are `L3` and `L6` internal heads mounted only as internal modules rather than new external ids?
+8. Is any `partial_mount` still being counted as fully mounted in regression or readiness claims?

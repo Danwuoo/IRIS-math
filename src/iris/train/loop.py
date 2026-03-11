@@ -24,6 +24,7 @@ from ..runtime import assert_jax_runtime
 from ..schema import STATE_IR_TOKEN_ORDER
 from ..trunk import build_typed_sequence, forward_with_params, init_trunk_params
 from .checkpoint import load_checkpoint, save_checkpoint_atomic
+from .data import load_policy_bundle_for_profile
 from .data.contracts import load_default_pure_lm_profile, load_profile
 from .data.iterator import PureLMStreamingProvider, deterministic_sampling_key
 from .data.planner import build_hybrid_schedule
@@ -156,6 +157,55 @@ def _write_runtime_lock_manifest(
     }
 
 
+def _manifest_version(manifest: Any | None) -> str:
+    if manifest is None:
+        return "not_applicable"
+    return str(getattr(manifest, "backend_version", "not_applicable") or "not_applicable")
+
+
+def _manifest_build_id(manifest: Any | None) -> str:
+    if manifest is None:
+        return "not_applicable"
+    return str(getattr(manifest, "build_or_commit_hash", "not_applicable") or "not_applicable")
+
+
+def _active_governance_snapshot(config: "ToyTrainConfig") -> Dict[str, Any]:
+    bundle = load_policy_bundle_for_profile(config.policy_profile_id)
+    manifests = bundle.provenance_manifests
+    parser_manifest = manifests.get("math-doc-pipeline-v1")
+    layout_manifest = manifests.get("layout-parser-v1")
+    ocr_manifest = manifests.get("ocr-parser-v1")
+    formula_manifest = manifests.get("formula-parser-v1")
+    semantic_manifest = manifests.get("semantic-unit-typer-v1")
+    formalizer_manifest = manifests.get("formalizer-skeleton-v1")
+    verifier_manifest = manifests.get("verifier-stack-v1")
+    return {
+        "policy_profile_id": str(config.policy_profile_id),
+        "phase": str(config.phase),
+        "policy_bundle_sha256": bundle.bundle_sha256,
+        "data_realization_policy_id": bundle.data_realization_policy.data_realization_policy_id,
+        "decontam_policy_id": bundle.decontam_policy.decontam_policy_id,
+        "benchmark_family_policy_refs": list(bundle.data_realization_policy.benchmark_family_policy_refs),
+        "parser_provenance_id": getattr(parser_manifest, "manifest_id", "not_applicable"),
+        "parser_provenance_refs": {
+            "layout_parser_manifest_id": getattr(layout_manifest, "manifest_id", "not_applicable"),
+            "ocr_manifest_id": getattr(ocr_manifest, "manifest_id", "not_applicable"),
+            "formula_parser_manifest_id": getattr(formula_manifest, "manifest_id", "not_applicable"),
+            "semantic_unit_typer_manifest_id": getattr(semantic_manifest, "manifest_id", "not_applicable"),
+        },
+        "parse_config_fingerprint": getattr(parser_manifest, "config_fingerprint", "not_applicable"),
+        "ocr_layout_extractor_version": (
+            f"layout:{_manifest_version(layout_manifest)}|ocr:{_manifest_version(ocr_manifest)}"
+        ),
+        "formula_parser_version": _manifest_version(formula_manifest),
+        "semantic_unit_typer_version": _manifest_version(semantic_manifest),
+        "formalizer_provenance_id": getattr(formalizer_manifest, "manifest_id", "not_applicable"),
+        "formalizer_version": _manifest_version(formalizer_manifest),
+        "verifier_provenance_id": getattr(verifier_manifest, "manifest_id", "not_applicable"),
+        "verifier_build_id": _manifest_build_id(verifier_manifest),
+    }
+
+
 def _should_crash(config: "ToyTrainConfig", point: str, segment_id: int) -> bool:
     return config.crash_point == point and config.crash_segment == segment_id
 
@@ -258,6 +308,7 @@ class ToyTrainConfig:
     snapshot_root: Optional[Path] = None
     tokens_per_micro_step: int = 128
     hybrid_pure_ratio: float = 0.9
+    policy_profile_id: str = "P1"
 
     def as_dict(self) -> Dict[str, Any]:
         payload = dict(self.__dict__)
@@ -302,6 +353,7 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
         phase=config.phase,
         runtime_lock_manifest_path=config.runtime_lock_manifest_path,
     )
+    governance = _active_governance_snapshot(config)
     segment_micro_steps = max(int(config.micro_steps), 1)
     tokens_per_micro_step = max(int(config.tokens_per_micro_step), 1)
 
@@ -424,7 +476,24 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
                 "grad_stats_hash": "pending",
                 "code_version_hash": code_version_hash,
                 "config_hash": config_hash,
+                "runtime_lock_manifest_id": runtime_lock["runtime_lock_manifest_id"],
                 "runtime_lock_manifest_sha256": runtime_lock["runtime_lock_manifest_sha256"],
+                "policy_bundle_sha256": governance["policy_bundle_sha256"],
+                "profile_id": governance["policy_profile_id"],
+                "phase": governance["phase"],
+                "data_realization_policy_id": governance["data_realization_policy_id"],
+                "decontam_policy_id": governance["decontam_policy_id"],
+                "benchmark_family_policy_refs": governance["benchmark_family_policy_refs"],
+                "parser_provenance_id": governance["parser_provenance_id"],
+                "parser_provenance_refs": governance["parser_provenance_refs"],
+                "parse_config_fingerprint": governance["parse_config_fingerprint"],
+                "ocr_layout_extractor_version": governance["ocr_layout_extractor_version"],
+                "formula_parser_version": governance["formula_parser_version"],
+                "semantic_unit_typer_version": governance["semantic_unit_typer_version"],
+                "formalizer_provenance_id": governance["formalizer_provenance_id"],
+                "formalizer_version": governance["formalizer_version"],
+                "verifier_provenance_id": governance["verifier_provenance_id"],
+                "verifier_build_id": governance["verifier_build_id"],
                 "data.profile_id": data_profile_id,
                 "data.sources_manifest_sha256": data_sources_manifest_sha256,
                 "data.tokenizer_fingerprint": data_tokenizer_fingerprint,
@@ -574,6 +643,7 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
 
         current_events = load_journal(journal_path)
         checkpoint_payload = {
+            "schema": "iris.training_checkpoint/v2",
             "model_state": {
                 "schema": "iris.model_state/v2",
                 "backend": "jax",
@@ -587,13 +657,30 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
             "segment_id_last_applied": segment_id,
             "optimizer_step_id_last_applied": optimizer_state["step"],
             "dataset_slice_id_last_applied": dataset_slice_id,
+            "profile_id": governance["policy_profile_id"],
+            "phase": governance["phase"],
+            "policy_bundle_sha256": governance["policy_bundle_sha256"],
             "runtime_lock_manifest_id": runtime_lock["runtime_lock_manifest_id"],
             "runtime_lock_manifest_sha256": runtime_lock["runtime_lock_manifest_sha256"],
+            "data_realization_policy_id": governance["data_realization_policy_id"],
+            "decontam_policy_id": governance["decontam_policy_id"],
+            "benchmark_family_policy_refs": governance["benchmark_family_policy_refs"],
+            "parser_provenance_id": governance["parser_provenance_id"],
+            "parser_provenance_refs": governance["parser_provenance_refs"],
+            "parse_config_fingerprint": governance["parse_config_fingerprint"],
+            "ocr_layout_extractor_version": governance["ocr_layout_extractor_version"],
+            "formula_parser_version": governance["formula_parser_version"],
+            "semantic_unit_typer_version": governance["semantic_unit_typer_version"],
+            "formalizer_provenance_id": governance["formalizer_provenance_id"],
+            "formalizer_version": governance["formalizer_version"],
+            "verifier_provenance_id": governance["verifier_provenance_id"],
+            "verifier_build_id": governance["verifier_build_id"],
             "journal_head_event_id": pending_record["event_id"],
             "journal_head_hash": journal_head_hash(current_events),
             "code_version_hash": code_version_hash,
             "config_hash": config_hash,
             "dataset_plan_hash": data_plan_hash,
+            "governance_state": dict(governance),
             "data_provenance": {
                 "data_source": data_source,
                 "profile_id": data_profile_id,
@@ -602,6 +689,18 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
                 "tokenizer_fingerprint": data_tokenizer_fingerprint,
                 "streaming_mode_effective": data_streaming_mode_effective,
                 "token_ledger": token_ledger.as_dict(),
+                "governance_profile_id": governance["policy_profile_id"],
+                "governance_phase": governance["phase"],
+                "policy_bundle_sha256": governance["policy_bundle_sha256"],
+                "data_realization_policy_id": governance["data_realization_policy_id"],
+                "decontam_policy_id": governance["decontam_policy_id"],
+                "benchmark_family_policy_refs": governance["benchmark_family_policy_refs"],
+                "parser_provenance_id": governance["parser_provenance_id"],
+                "parser_provenance_refs": governance["parser_provenance_refs"],
+                "parse_config_fingerprint": governance["parse_config_fingerprint"],
+                "formalizer_provenance_id": governance["formalizer_provenance_id"],
+                "verifier_provenance_id": governance["verifier_provenance_id"],
+                "verifier_build_id": governance["verifier_build_id"],
             },
         }
         checkpoint_ref = save_checkpoint_atomic(
@@ -629,7 +728,24 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
                 "grad_stats_hash": _stable_hash({"mean_grad_norm": mean_grad_norm}),
                 "code_version_hash": code_version_hash,
                 "config_hash": config_hash,
+                "runtime_lock_manifest_id": runtime_lock["runtime_lock_manifest_id"],
                 "runtime_lock_manifest_sha256": runtime_lock["runtime_lock_manifest_sha256"],
+                "policy_bundle_sha256": governance["policy_bundle_sha256"],
+                "profile_id": governance["policy_profile_id"],
+                "phase": governance["phase"],
+                "data_realization_policy_id": governance["data_realization_policy_id"],
+                "decontam_policy_id": governance["decontam_policy_id"],
+                "benchmark_family_policy_refs": governance["benchmark_family_policy_refs"],
+                "parser_provenance_id": governance["parser_provenance_id"],
+                "parser_provenance_refs": governance["parser_provenance_refs"],
+                "parse_config_fingerprint": governance["parse_config_fingerprint"],
+                "ocr_layout_extractor_version": governance["ocr_layout_extractor_version"],
+                "formula_parser_version": governance["formula_parser_version"],
+                "semantic_unit_typer_version": governance["semantic_unit_typer_version"],
+                "formalizer_provenance_id": governance["formalizer_provenance_id"],
+                "formalizer_version": governance["formalizer_version"],
+                "verifier_provenance_id": governance["verifier_provenance_id"],
+                "verifier_build_id": governance["verifier_build_id"],
                 "data.profile_id": data_profile_id,
                 "data.sources_manifest_sha256": data_sources_manifest_sha256,
                 "data.tokenizer_fingerprint": data_tokenizer_fingerprint,
@@ -685,6 +801,22 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
                     "resume_path_id": effective_resume_path,
                     "runtime_lock_manifest_id": runtime_lock["runtime_lock_manifest_id"],
                     "runtime_lock_manifest_sha256": runtime_lock["runtime_lock_manifest_sha256"],
+                    "policy_bundle_sha256": governance["policy_bundle_sha256"],
+                    "profile_id": governance["policy_profile_id"],
+                    "phase": governance["phase"],
+                    "data_realization_policy_id": governance["data_realization_policy_id"],
+                    "decontam_policy_id": governance["decontam_policy_id"],
+                    "benchmark_family_policy_refs": governance["benchmark_family_policy_refs"],
+                    "parser_provenance_id": governance["parser_provenance_id"],
+                    "parser_provenance_refs": governance["parser_provenance_refs"],
+                    "parse_config_fingerprint": governance["parse_config_fingerprint"],
+                    "ocr_layout_extractor_version": governance["ocr_layout_extractor_version"],
+                    "formula_parser_version": governance["formula_parser_version"],
+                    "semantic_unit_typer_version": governance["semantic_unit_typer_version"],
+                    "formalizer_provenance_id": governance["formalizer_provenance_id"],
+                    "formalizer_version": governance["formalizer_version"],
+                    "verifier_provenance_id": governance["verifier_provenance_id"],
+                    "verifier_build_id": governance["verifier_build_id"],
                     "code_version_hash": code_version_hash,
                     "config_hash": config_hash,
                     "trunk.backend": "jax",

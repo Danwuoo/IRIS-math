@@ -12,6 +12,86 @@ from .base import LevelInput, LevelInterface, LevelOutput, basic_state_diagnosti
 LEVEL_IDS: Tuple[str, ...] = tuple(f"L{index}" for index in range(7))
 
 
+def _state_target_summary(state_out: Any) -> Dict[str, Any]:
+    return {
+        "pf_task_type": state_out.PF.task_type,
+        "pf_target_spec": state_out.PF.target_spec,
+        "frontier_count": len(state_out.FR),
+        "verifier_evidence_count": len(state_out.VS),
+    }
+
+
+def _emitted_object_refs(state_out: Any) -> Dict[str, Any]:
+    branch_ids = [entry.branch_id for entry in state_out.FR if hasattr(entry, "branch_id")]
+    subgoal_ids = [entry.subgoal_id for entry in state_out.FR if hasattr(entry, "subgoal_id")]
+    vs_ids = [entry.vs_id for entry in state_out.VS if hasattr(entry, "vs_id")]
+    lm_ids = [entry.lm_id for entry in state_out.LM if hasattr(entry, "lm_id")]
+    return {
+        "branch_ids": branch_ids,
+        "subgoal_ids": subgoal_ids,
+        "vs_ids": vs_ids,
+        "lm_ids": lm_ids,
+    }
+
+
+def _l3_internal_heads(state_out: Any, control_raw: jax.Array) -> Dict[str, Any]:
+    branch_ids = [entry.branch_id for entry in state_out.FR if hasattr(entry, "branch_id")]
+    subgoal_ids = [entry.subgoal_id for entry in state_out.FR if hasattr(entry, "subgoal_id")]
+    return {
+        "branch_controller": {
+            "status": "mounted",
+            "selected_branch_id": branch_ids[0] if branch_ids else None,
+            "selected_subgoal_id": subgoal_ids[0] if subgoal_ids else None,
+            "strategy_transition_score": float(np.asarray(control_raw[0])),
+        },
+        "budget_allocator": {
+            "status": "mounted",
+            "budget_pressure": float(jax.nn.sigmoid(control_raw[1])),
+            "global_step_budget_remaining": state_out.CS.budget_state.global_step_budget_remaining,
+            "verifier_probe_budget_remaining": state_out.CS.budget_state.verifier_probe_budget_remaining,
+        },
+        "repair_scheduler": {
+            "status": "mounted",
+            "recovery_target": state_out.CS.recovery_target,
+            "selected_action_type": state_out.CS.selected_action.action_type,
+            "repair_score": float(np.asarray(control_raw[2])),
+        },
+    }
+
+
+def _l6_internal_heads(
+    state_out: Any,
+    control_raw: jax.Array,
+    credit: Mapping[str, float],
+) -> Dict[str, Any]:
+    confidence = float(jax.nn.sigmoid(control_raw[7]))
+    false_accept_risk = max(0.0, 1.0 - confidence)
+    false_reject_risk = max(0.0, confidence - 0.5)
+    evidence_classes = sorted({entry.evidence_class for entry in state_out.VS if hasattr(entry, "evidence_class")})
+    dominant_level = max(credit, key=lambda key: float(credit[key]))
+    return {
+        "verifier_aggregator": {
+            "status": "mounted",
+            "evidence_classes": evidence_classes,
+            "supporting_vs_ids": [entry.vs_id for entry in state_out.VS if hasattr(entry, "vs_id")],
+            "disagreement": float(abs(np.asarray(control_raw[0]) - np.asarray(control_raw[1]))),
+        },
+        "credit_router": {
+            "status": "mounted",
+            "failure.credit": dict(credit),
+            "dominant_level": dominant_level,
+            "multi_level": len([value for value in credit.values() if value >= 0.1]) > 1,
+        },
+        "calibration_head": {
+            "status": "mounted",
+            "confidence": confidence,
+            "abstention_margin": float(abs(confidence - 0.5)),
+            "false_accept_risk": float(false_accept_risk),
+            "false_reject_risk": float(false_reject_risk),
+        },
+    }
+
+
 def _random_matrix(key: jax.Array, shape: Tuple[int, ...], scale: float = 0.02) -> jax.Array:
     return scale * jax.random.normal(key, shape=shape, dtype=jnp.float32)
 
@@ -116,6 +196,11 @@ class _MountedLevel(LevelInterface):
                 "level": self.level_id,
                 "enabled": True,
                 "disabled": False,
+                "implementation_status": "mounted",
+                "invocation_outcome": "updated_state",
+                "target_summary": _state_target_summary(state_out),
+                "emitted_object_refs": _emitted_object_refs(state_out),
+                "evidence_trigger_refs": [],
                 "confidence": float(jax.nn.sigmoid(control_raw[7])),
                 "uncertainty": float(1.0 - jax.nn.sigmoid(control_raw[7])),
                 "failure_tags": [],
@@ -135,6 +220,11 @@ class _MountedLevel(LevelInterface):
             }
             diagnostics["failure.credit"] = credit
             diagnostics["credit_hints"] = credit
+            diagnostics["internal_heads"] = _l6_internal_heads(state_out, control_raw, credit)
+        elif self.level_id == "L3":
+            diagnostics["internal_heads"] = _l3_internal_heads(state_out, control_raw)
+        else:
+            diagnostics["internal_heads"] = {}
 
         return LevelOutput(
             state_out=state_out,

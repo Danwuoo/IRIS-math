@@ -29,27 +29,32 @@ Read these documents in this order before implementing, modifying, or reviewing 
 1. `docs/數學模型建議.md`
 2. `docs/00_INDEX.md`
 3. `docs/10_Glossary_and_Normative_Status.md`
-4. `docs/07_Data_Constitution.md`
-5. `docs/01_Architecture_Constitution.md`
-6. `docs/02_State_IR_Spec.md`
-7. `docs/03_Level_Contracts_L0-L6.md`
-8. `docs/04_Credit_Assignment_and_Recovery.md`
+4. `docs/13_Goals_and_Success_Criteria.md`
+5. `docs/07_Data_Constitution.md`
+6. `docs/01_Architecture_Constitution.md`
+7. `docs/02_State_IR_Spec.md`
+8. `docs/03_Level_Contracts_L0-L6.md`
+9. `docs/04_Credit_Assignment_and_Recovery.md`
 
 These define the active target.
 
 ---
 
 ## 2) Policy / Workflow Reading (Required When Relevant)
-If the task touches metrics, regression, evaluation policy, phase gates, training governance, data realization, reproducibility, or scaling profiles, you must also read:
+If the task touches metrics, regression, evaluation policy, phase gates, training governance, data realization, reproducibility, scaling profiles, document parsing, benchmark governance, verifier behavior, or readiness claims, you must also read the relevant companion docs and policies:
 
 - `docs/05_Eval_Metrics_Spec.md`
 - `docs/06_Regression_and_Phase_Gates.md`
 - `docs/08_Training_Run_Governance.md`
 - `docs/09_Training_Profiles_and_Scaling.md`
+- `docs/14_Multimodal_Document_Pipeline.md`
+- `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
+- `docs/16_Verifier_and_Formalization_Stack.md`
+- `docs/17_Scaling_Promotion_and_Readiness.md`
 
 Notes:
 
-- `docs/11_Phase_D_Diagnostics_Design_Note.md` and `docs/12_Phase_E_Execution_Design_Note.md` are archive notes, not active guidance.
+- `docs/11_Phase_D_Diagnostics_Design_Note.md` and `docs/12_Phase_E_Execution_Design_Note.md` are archive notes, not active guidance. They may mention legacy `StateIR(T,G,O,R,X,M)` or ARC-specific semantics and must not be used as active authority.
 - `docs/codex_plan/*` is operational guidance only and cannot override active contracts.
 
 ---
@@ -67,6 +72,12 @@ Treat the following as active v2 documents:
 - `docs/06_Regression_and_Phase_Gates.md`
 - `docs/07_Data_Constitution.md`
 - `docs/08_Training_Run_Governance.md`
+- `docs/09_Training_Profiles_and_Scaling.md`
+- `docs/13_Goals_and_Success_Criteria.md`
+- `docs/14_Multimodal_Document_Pipeline.md`
+- `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
+- `docs/16_Verifier_and_Formalization_Stack.md`
+- `docs/17_Scaling_Promotion_and_Readiness.md`
 
 ### 3.2 Documentation-First Transition Rule
 During the transition period:
@@ -82,10 +93,15 @@ You may directly edit:
 
 - `AGENTS.md`
 - `docs/00_INDEX.md`
-- `docs/10_Glossary_and_Normative_Status.md`
 - `docs/07_Data_Constitution.md`
 - `docs/08_Training_Run_Governance.md`
 - `docs/09_Training_Profiles_and_Scaling.md`
+- `docs/10_Glossary_and_Normative_Status.md`
+- `docs/13_Goals_and_Success_Criteria.md`
+- `docs/14_Multimodal_Document_Pipeline.md`
+- `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
+- `docs/16_Verifier_and_Formalization_Stack.md`
+- `docs/17_Scaling_Promotion_and_Readiness.md`
 - `docs/codex_plan/*`
 - `docs/repo-tree.txt`
 - `src/`
@@ -118,7 +134,7 @@ Reject changes that do any of the following:
 3. Replace learned routing, gating, recovery, or termination with deterministic if/else policy, except clearly labeled temporary guardrails.
 4. Turn Level 2 into a handwritten symbolic executor or DSL-centered solver core.
 5. Remove or bypass Level interfaces `L0-L6`, even if some implementations remain stubs.
-6. Reintroduce a blanket "benchmark = probe only" dogma that contradicts `docs/07_Data_Constitution.md`.
+6. Reintroduce a blanket "benchmark = probe only" dogma that contradicts `docs/07_Data_Constitution.md` and `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
 7. Mix benchmark data into training without declared tiering, decontamination policy, and held-out audit.
 
 If you refuse a change under this section, you must provide the nearest contract-compliant alternative or a concrete migration note.
@@ -166,7 +182,7 @@ If you introduce a hard cap or deterministic fallback, you must:
 - Core model behavior belongs in `src/`.
 - Documents define the active target; code may lag during transition, but must move toward them.
 - Tools remain tools; they must not become the intelligence substrate.
-- Data policy, benchmark tiering, and provenance rules must come from `docs/07_Data_Constitution.md`, not ad hoc scripts.
+- Data policy, benchmark tiering, provenance rules, document-pipeline constraints, verifier evidence classes, and scaling readiness rules must come from the active docs, not ad hoc scripts.
 
 ---
 

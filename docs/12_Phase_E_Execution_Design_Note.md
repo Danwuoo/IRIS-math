@@ -1,7 +1,8 @@
-﻿# Phase E Execution Design Note
+# Phase E Execution Design Note
 
 **Document Type:** Design Note (Non-normative)  
-**Normative Boundaries:** This note does not override `docs/01`~`docs/08`.
+**Normative Boundaries:** This note does not override `docs/01`~`docs/08`.  
+**Archive Warning:** This note preserves baseline ARC/baseline-profile execution context. It contains legacy ARC-specific semantics and probe-only assumptions and must not be used as active authority for IRIS-math v2.
 
 ## 1. Scope
 

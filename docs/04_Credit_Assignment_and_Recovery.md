@@ -22,6 +22,12 @@ During the first-round v2 design:
 
 No new external level ids are introduced in this round.
 
+Internal ownership rule:
+
+- `L3` may mount internal recovery modules, but they remain part of `L3`,
+- `L6` may mount internal learning-signal modules, but they remain part of `L6`,
+- names such as `L7` or `L8` may survive only as internal shorthand and must not become new external ids, failure codes, or gate identities.
+
 ---
 
 ## 2. Core Principles
@@ -96,6 +102,20 @@ Constraints:
 - `Σ ck = 1`
 - hard single-level blame is not the canonical output
 
+### 4.3 Internal Head Handshake
+
+The canonical `L6 -> L3` handoff is allowed to be internally modular, but the ownership boundary stays fixed:
+
+- `L6.verifier_aggregator` summarizes verifier evidence classes and supporting refs,
+- `L6.credit_router` emits `failure.credit` plus suspected failure loci,
+- `L6.calibration_head` emits calibrated confidence and acceptance-risk summaries,
+- `L3.branch_controller` chooses branch / strategy transition behavior,
+- `L3.budget_allocator` adjusts search, verifier, or reparse budget,
+- `L3.repair_scheduler` orders targeted recovery against the credited loci.
+
+The codebase may realize these as separate internal modules or fused learned blocks.
+What is not allowed is treating them as new external levels or letting them bypass `L3` / `L6` accountability.
+
 ---
 
 ## 5. Canonical Recovery Actions
@@ -125,6 +145,7 @@ Examples:
 - `F_MEM + F_ABS`: retrieved lemma mismatch plus over-aggressive abstraction
 
 `L3` decides staged or parallel recovery order using learned policy.
+That policy must still expose whether branch choice, budget reallocation, or repair scheduling was the dominant control factor.
 
 ---
 
@@ -166,5 +187,11 @@ Every level must expose enough diagnostics for `L6` to reason about:
 - calibration,
 - recovery usefulness.
 
-Opaque levels are non-compliant.
+For `L3` and `L6`, "enough diagnostics" means at least:
 
+- per-head `implementation_status` for the mounted internal heads,
+- emitted target refs or affected loci,
+- verifier evidence refs or other triggers behind the decision when applicable,
+- explicit indication of whether the result came from normal progression, targeted recovery, re-verification, or recalibration.
+
+Opaque levels are non-compliant.

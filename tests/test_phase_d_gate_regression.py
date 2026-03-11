@@ -4,6 +4,11 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
+
+pytest.importorskip("jax")
+pytest.importorskip("flax")
+pytest.importorskip("optax")
 
 from iris.regression import (
     GateContext,
@@ -13,6 +18,7 @@ from iris.regression import (
     evaluate_s5_status_v2,
     run_phase_d_gate,
 )
+from iris.schema import STATE_IR_TOKEN_ORDER
 from iris.train.checkpoint import save_checkpoint_atomic
 
 
@@ -48,7 +54,7 @@ def _runtime_manifest_payload() -> dict:
 
 def _build_model_run(tmp_path: Path, hidden_dim: int = 12) -> Path:
     trunk = {
-        "type_embeddings": np.zeros((6, hidden_dim), dtype=np.float32),
+        "type_embeddings": np.zeros((len(STATE_IR_TOKEN_ORDER), hidden_dim), dtype=np.float32),
         "seq_w": np.zeros((hidden_dim, hidden_dim), dtype=np.float32),
         "seq_b": np.zeros((hidden_dim,), dtype=np.float32),
         "ctrl_w": np.zeros((hidden_dim, 8), dtype=np.float32),

@@ -1,6 +1,7 @@
-from .schema import STATE_IR_TOKEN_ORDER, StateIR, StateIRValidationError
+from .schema import STATE_IR_SLOT_ORDER, STATE_IR_TOKEN_ORDER, StateIR, StateIRValidationError
 
 __all__ = [
+    "STATE_IR_SLOT_ORDER",
     "STATE_IR_TOKEN_ORDER",
     "StateIR",
     "StateIRValidationError",

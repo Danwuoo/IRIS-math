@@ -12,6 +12,7 @@ pytest.importorskip("flax")
 pytest.importorskip("optax")
 
 from iris.arc.benchmark_bridge import export_benchmark_submission
+from iris.schema import STATE_IR_TOKEN_ORDER
 from iris.train.checkpoint import save_checkpoint_atomic
 
 
@@ -29,7 +30,7 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
 
 def _build_model_run(tmp_path: Path, hidden_dim: int = 12) -> Path:
     trunk = {
-        "type_embeddings": np.zeros((6, hidden_dim), dtype=np.float32),
+        "type_embeddings": np.zeros((len(STATE_IR_TOKEN_ORDER), hidden_dim), dtype=np.float32),
         "seq_w": np.zeros((hidden_dim, hidden_dim), dtype=np.float32),
         "seq_b": np.zeros((hidden_dim,), dtype=np.float32),
         "ctrl_w": np.zeros((hidden_dim, 8), dtype=np.float32),

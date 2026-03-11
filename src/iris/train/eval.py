@@ -104,10 +104,40 @@ def evaluate_latest_run(
         task_confidence=0.5,
         extra={
             "phase": phase,
+            "profile_id": checkpoint.get("profile_id", last_metrics.get("profile_id", "")),
             "segment_id": segment_id,
             "dataset_slice_id": dataset_slice_id,
             "eval.source": "latest_checkpoint",
             "data_seed": resolved_data_seed,
+            "policy_bundle_sha256": checkpoint.get(
+                "policy_bundle_sha256", last_metrics.get("policy_bundle_sha256", "")
+            ),
+            "data_realization_policy_id": checkpoint.get(
+                "data_realization_policy_id", last_metrics.get("data_realization_policy_id", "")
+            ),
+            "decontam_policy_id": checkpoint.get(
+                "decontam_policy_id", last_metrics.get("decontam_policy_id", "")
+            ),
+            "benchmark_family_policy_refs": checkpoint.get(
+                "benchmark_family_policy_refs",
+                last_metrics.get("benchmark_family_policy_refs", []),
+            ),
+            "parser_provenance_id": checkpoint.get(
+                "parser_provenance_id", last_metrics.get("parser_provenance_id", "")
+            ),
+            "parser_provenance_refs": checkpoint.get(
+                "parser_provenance_refs", last_metrics.get("parser_provenance_refs", {})
+            ),
+            "parse_config_fingerprint": checkpoint.get(
+                "parse_config_fingerprint", last_metrics.get("parse_config_fingerprint", "")
+            ),
+            "formalizer_provenance_id": checkpoint.get(
+                "formalizer_provenance_id",
+                last_metrics.get("formalizer_provenance_id", ""),
+            ),
+            "verifier_provenance_id": checkpoint.get(
+                "verifier_provenance_id", last_metrics.get("verifier_provenance_id", "")
+            ),
             "data_source": last_metrics.get("data_source", data_provenance.get("data_source", "synthetic")),
             "data.profile_id": data_provenance.get("profile_id", last_metrics.get("data.profile_id", "")),
             "data.sources_manifest_sha256": data_provenance.get(

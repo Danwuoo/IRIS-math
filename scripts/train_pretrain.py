@@ -7,11 +7,16 @@ from pathlib import Path
 
 import _bootstrap  # noqa: F401
 from iris.runtime import assert_jax_runtime
-from iris.train import ToyTrainConfig, run_toy_training
+from iris.train import ToyTrainConfig, load_policy_bundle, run_toy_training
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run Phase E pretrain entrypoint with Pure LM streaming + synthetic mix.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run the legacy baseline pretrain entrypoint. "
+            "Active v2 claims require a validated five-pool data policy bundle."
+        )
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("artifacts/phase_e_pretrain"))
     parser.add_argument("--run-id", type=str, default="phase-e-pretrain")
     parser.add_argument("--segments", type=int, default=2)
@@ -37,6 +42,12 @@ def main() -> int:
         default=None,
         help="Path to Pure LM profile JSON (default uses built-in pure_lm_90_v1).",
     )
+    parser.add_argument(
+        "--data-policy-bundle",
+        type=Path,
+        default=None,
+        help="Optional path to an active-v2 iris.data_policy_bundle/v1 JSON for validation and reporting.",
+    )
     parser.add_argument("--tokenizer-id-or-path", type=str, required=True)
     parser.add_argument(
         "--streaming-mode",
@@ -57,6 +68,14 @@ def main() -> int:
     )
 
     args = parser.parse_args()
+
+    policy_bundle = None
+    if args.data_policy_bundle is not None:
+        try:
+            policy_bundle = load_policy_bundle(args.data_policy_bundle)
+        except Exception as error:
+            print(f"DATA POLICY BUNDLE INVALID: {error}", file=sys.stderr)
+            return 2
 
     assert_jax_runtime(
         device=args.device,
@@ -95,6 +114,13 @@ def main() -> int:
     except RuntimeError as error:
         print(f"TRAIN INTERRUPTED: {error}", file=sys.stderr)
         return 2
+
+    if policy_bundle is not None:
+        summary["data_policy_bundle_sha256"] = policy_bundle.bundle_sha256
+        summary["data_realization_policy_id"] = (
+            policy_bundle.data_realization_policy.data_realization_policy_id
+        )
+        summary["decontam_policy_id"] = policy_bundle.decontam_policy.decontam_policy_id
 
     print(json.dumps(summary, sort_keys=True))
     return 0

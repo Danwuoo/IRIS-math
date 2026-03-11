@@ -2,7 +2,7 @@
 
 **Document Type:** Engineering Governance (Policy-Binding)  
 **Scope:** Segment transactions, exactly-once resume, runtime lock, reproducibility controls, and provenance requirements for IRIS-math v2  
-**Related active docs:** `docs/05_Eval_Metrics_Spec.md`, `docs/06_Regression_and_Phase_Gates.md`, `docs/07_Data_Constitution.md`, `docs/09_Training_Profiles_and_Scaling.md`
+**Related active docs:** `docs/05_Eval_Metrics_Spec.md`, `docs/06_Regression_and_Phase_Gates.md`, `docs/07_Data_Constitution.md`, `docs/09_Training_Profiles_and_Scaling.md`, `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`
 
 ---
 
@@ -11,6 +11,9 @@
 - This document is policy-binding for training operations.
 - It does not override architecture, State IR, level, or credit-assignment contracts.
 - Benchmark handling in training must follow `docs/07_Data_Constitution.md`; this document governs execution semantics, not benchmark policy by itself.
+- Benchmark-family-specific allowances and forbidden uses are governed by `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
+- Verifier evidence interpretation is governed by `docs/16_Verifier_and_Formalization_Stack.md`.
+- Profile-readiness claims are governed by `docs/17_Scaling_Promotion_and_Readiness.md`.
 
 ---
 
@@ -21,6 +24,7 @@ Define the run-time governance required for long mathematical training runs:
 - segment transaction semantics,
 - exactly-once progress,
 - reproducibility and runtime lock control,
+- data-realization and decontamination policy capture,
 - parser / formalizer / verifier provenance capture,
 - resume drift diagnosis.
 
@@ -44,7 +48,8 @@ Benchmark policy summary:
 
 - Tier 1 benchmark data may be train-visible only under the declared policy in `docs/07_Data_Constitution.md`.
 - Tier 2 and Tier 3 remain evaluation surfaces.
-- Governance must record which tier policy was active for the run.
+- Governance must record which executable data-realization and decontamination policies were active for the run.
+- Family-specific benchmark usage must also remain consistent with `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
 
 ---
 
@@ -111,11 +116,18 @@ Journal schema remains `iris.segment_journal/v1` and must stay append-only.
 | `code_version_hash` | string | Code provenance |
 | `config_hash` | string | Full config provenance |
 | `runtime_lock_manifest_sha256` | string | Runtime provenance |
-| `tier_policy_id` | string | Active benchmark/data-tier policy id |
-| `parser_provenance_id` | string/null | Required for document-derived or multimodal segments |
-| `ocr_layout_extractor_version` | string/null | Required when OCR/layout parsing is active |
-| `formalizer_version` | string/null | Required when natural-to-formal conversion is active |
-| `verifier_build_id` | string/null | Required when verifier-generated labels or checks are active |
+| `data_realization_policy_id` | string | Active `data_realization_policy/v1` id |
+| `decontam_policy_id` | string | Active `decontam_policy/v1` id |
+| `benchmark_family_policy_refs` | string/list | Active `benchmark_family_policy/v1` refs when benchmark-derived material is present |
+| `parser_provenance_id` | string/null | Required for document-derived or multimodal segments; identifies the canonical parse pipeline manifest |
+| `parser_provenance_refs` | string/object/null | Required when layout, OCR, formula parsing, or semantic-unit typing surfaces are mounted; must resolve manifest ids for each active surface |
+| `parse_config_fingerprint` | string/null | Required when document parsing is active; hashes behavior-affecting parse config |
+| `ocr_layout_extractor_version` | string/null | Human-readable summary only; not authoritative without manifest refs |
+| `formula_parser_version` | string/null | Human-readable summary only; not authoritative without manifest refs |
+| `formalizer_provenance_id` | string/null | Required when natural-to-formal conversion is active |
+| `formalizer_version` | string/null | Human-readable summary only; not authoritative without manifest ref |
+| `verifier_provenance_id` | string/null | Required when verifier-generated labels or checks are active |
+| `verifier_build_id` | string/null | Human-readable summary only; not authoritative without manifest ref |
 | `checkpoint_ref` | string/null | Required for `APPLIED` |
 
 ### 5.2 Authority Rules
@@ -150,10 +162,17 @@ Commit protocol:
 - `dataset_slice_id_last_applied`
 - `runtime_lock_manifest_id`
 - `runtime_lock_manifest_sha256`
-- `tier_policy_id`
+- `data_realization_policy_id`
+- `decontam_policy_id`
+- `benchmark_family_policy_refs`
 - `parser_provenance_id`
+- `parser_provenance_refs`
+- `parse_config_fingerprint`
 - `ocr_layout_extractor_version`
+- `formula_parser_version`
+- `formalizer_provenance_id`
 - `formalizer_version`
+- `verifier_provenance_id`
 - `verifier_build_id`
 - `journal_head_event_id`
 - `journal_head_hash`
@@ -196,10 +215,14 @@ Required keys:
 
 When the slice is document-derived or verifier-derived, the effective slice identity must also be stable with respect to:
 
-- parser provenance,
-- OCR/layout extractor version,
-- formalizer version,
-- verifier build id.
+- data-realization policy id,
+- decontamination policy id,
+- parser provenance id,
+- parser provenance refs,
+- parse config fingerprint,
+- OCR/layout and formula-parser version summaries,
+- formalizer provenance id,
+- verifier provenance id.
 
 ---
 
@@ -213,7 +236,8 @@ Pinned surfaces must include:
 - Python + framework surface,
 - compilation / XLA surface,
 - verifier build provenance when the verifier is part of training-time supervision,
-- parser / extractor build provenance when document parsing is part of the training data path.
+- parser / extractor build provenance when document parsing is part of the training data path,
+- formalizer build provenance when natural-to-formal conversion is part of the training data path.
 
 ### 9.1 Resume Validation Policy
 

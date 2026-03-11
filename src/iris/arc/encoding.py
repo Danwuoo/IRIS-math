@@ -7,7 +7,21 @@ from typing import List, Sequence, Tuple
 
 import numpy as np
 
-from ..schema import StateIR
+from ..schema import (
+    ApplicabilityAudit,
+    Branch,
+    BudgetState,
+    ConstraintRelation,
+    ControlAction,
+    ControlState,
+    LemmaBinding,
+    ProblemFrame,
+    RequiredOutput,
+    ScopeRef,
+    StateIR,
+    Subgoal,
+    SymbolEntry,
+)
 from .types import ArcExample, ArcTask, grid_shape
 
 
@@ -154,12 +168,102 @@ def encode_arc_case_to_state(
             return np.zeros((0, hidden_dim), dtype=np.float32)
         return np.stack(vectors, axis=0).astype(np.float32)
 
-    return StateIR(
-        T=np.expand_dims(task_token, axis=0),
-        G=np.expand_dims(global_token, axis=0),
-        O=_stack_or_empty(object_tokens),
-        R=_stack_or_empty(relation_tokens),
-        X=_stack_or_empty(event_tokens),
-        M=_stack_or_empty(macro_tokens),
+    problem_scope = ScopeRef(scope_kind="problem_global", scope_id="scope-problem")
+    branch_scope = ScopeRef(
+        scope_kind="branch_local",
+        scope_id="branch-0",
+        parent_scope_id=problem_scope.scope_id,
     )
 
+    symbols = tuple(
+        SymbolEntry(
+            sy_id=f"sy-{index}",
+            surface_form=f"grid_{index}",
+            entity_kind="grid_object",
+            scope_ref=problem_scope,
+            binding_state="bound",
+            type_status="typed",
+            vector=row,
+        )
+        for index, row in enumerate(_stack_or_empty(object_tokens))
+    )
+    constraints = tuple(
+        ConstraintRelation(
+            cg_id=f"cg-{index}",
+            relation_type="grid_transform",
+            arguments=(f"grid_{index}", f"grid_{index + 1}"),
+            relation_status="derived",
+            vector=row,
+        )
+        for index, row in enumerate(_stack_or_empty(relation_tokens))
+    )
+    frontier = [
+        Branch(
+            branch_id="branch-0",
+            branch_status="active",
+            local_scope_ref=branch_scope,
+            strategy_family="arc-compat",
+            summary="compatibility branch",
+            vector=global_token,
+        )
+    ]
+    frontier.extend(
+        Subgoal(
+            subgoal_id=f"subgoal-{index}",
+            branch_id="branch-0",
+            goal_kind="predict_output_grid",
+            target_payload=f"candidate_shape:{infer_target_shape(task, test_example)}",
+            goal_status="candidate",
+            vector=row,
+        )
+        for index, row in enumerate(_stack_or_empty(event_tokens))
+    )
+    memory = tuple(
+        LemmaBinding(
+            lm_id=f"lm-{index}",
+            memory_kind="pattern",
+            source_ref=task.task_id,
+            claim_signature=f"arc-pattern-{index}",
+            binding_map={},
+            applicability_audit=ApplicabilityAudit(
+                audit_status="provisional",
+                required_conditions=("shape_match",),
+            ),
+            retrieval_signal=0.0,
+            vector=row,
+        )
+        for index, row in enumerate(_stack_or_empty(macro_tokens))
+    )
+
+    return StateIR(
+        PF=ProblemFrame(
+            task_type="construct",
+            target_spec=f"arc:{task.task_id}",
+            required_output=RequiredOutput(
+                output_kind="construction",
+                answer_channel="structured_object",
+                formality_level="informal",
+            ),
+            problem_assumptions=(),
+            domain_tags=("arc_compatibility",),
+            source_anchor_refs=(),
+            frame_status="active",
+            vector=task_token,
+        ),
+        SY=symbols,
+        CG=constraints,
+        FR=tuple(frontier),
+        LM=memory,
+        VS=(),
+        CS=ControlState(
+            selected_action=ControlAction(
+                action_id="action-continue",
+                action_type="continue",
+                action_status="selected",
+            ),
+            budget_state=BudgetState(global_step_budget_remaining=1),
+            uncertainty_state="arc_estimate",
+            escalation_state="inactive",
+            vector=global_token,
+        ),
+    )

@@ -2,6 +2,7 @@
 
 **Document Type:** Design Note (Non-normative)  
 **Normative Boundaries:** This note does not override `docs/01`~`docs/06` or `docs/08`.
+**Archive Warning:** This note preserves baseline ARC-oriented design context. It contains legacy `StateIR(T,G,O,R,X,M)` and ARC-specific semantics and must not be used as active authority for IRIS-math v2.
 
 ## 1. Scope
 

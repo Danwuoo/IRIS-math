@@ -2,7 +2,8 @@
 
 **Document Type:** Canonical Binding Policy  
 **Audience:** Model, training, evaluation, parser, formalizer, and verifier pipelines  
-**Scope:** Canonical metric names, field semantics, and required metadata for IRIS-math v2
+**Scope:** Canonical metric names, field semantics, and required metadata for IRIS-math v2  
+**Companion authority:** `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`
 
 ---
 
@@ -18,6 +19,9 @@ This document defines the canonical metrics vocabulary used to describe:
 
 This document defines **what is measured**, not which suites are active.
 Suite activation lives in `docs/06_Regression_and_Phase_Gates.md`.
+Benchmark-family-specific governance lives in `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
+Verifier evidence classes and false accept / false reject policy live in `docs/16_Verifier_and_Formalization_Stack.md`.
+Profile-readiness promotion claims live in `docs/17_Scaling_Promotion_and_Readiness.md`.
 
 ---
 

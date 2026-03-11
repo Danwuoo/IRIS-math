@@ -34,10 +34,17 @@ def basic_state_diagnostics(state: StateIR) -> Dict[str, Any]:
     lengths = state.section_lengths()
     return {
         "state.token.count": state.total_tokens,
-        "rep.object.count": lengths["O"],
-        "rep.relation.count": lengths["R"],
-        "rep.event.count": lengths["X"],
-        "abs.macro.count": lengths["M"],
+        "state.slot_order": list(lengths.keys()),
+        "rep.symbol.count": lengths["SY"],
+        "rep.constraint.count": lengths["CG"],
+        "proc.frontier.count": lengths["FR"],
+        "mem.binding.count": lengths["LM"],
+        "eval.evidence.count": lengths["VS"],
+        "control.state.count": lengths["CS"],
+        "rep.object.count": lengths["SY"],
+        "rep.relation.count": lengths["CG"],
+        "rep.event.count": lengths["FR"] + lengths["VS"],
+        "abs.macro.count": lengths["LM"],
     }
 
 

@@ -2,7 +2,8 @@
 
 **Document Type:** Canonical Binding Workflow  
 **Metric Vocabulary Source:** `docs/05_Eval_Metrics_Spec.md`  
-**Scope:** Regression suites `S1-S8`, phase activation `A-E`, gate semantics, tolerance policy, required artifacts, and promotion criteria for IRIS-math v2
+**Scope:** Regression suites `S1-S8`, phase activation `A-E`, gate semantics, tolerance policy, required artifacts, and promotion criteria for IRIS-math v2  
+**Companion authority:** `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`
 
 ---
 
@@ -14,6 +15,9 @@ If a change improves aggregate score but violates an active regression gate, the
 
 The repository is in a documentation-first transition.
 Legacy ARC-family probes may still appear as compatibility signals, but they are not sufficient by themselves to define v2 readiness.
+Benchmark-family governance details live in `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
+Verifier evidence policy lives in `docs/16_Verifier_and_Formalization_Stack.md`.
+Capability-readiness promotion between `P1-P4` lives in `docs/17_Scaling_Promotion_and_Readiness.md`.
 
 ---
 
@@ -324,6 +328,9 @@ Required metadata includes:
 ---
 
 ## 10. Promotion Criteria
+
+These criteria govern **phase promotion** only.
+They do not define hardware/profile promotion across `P1-P4`.
 
 ### `A -> B`
 

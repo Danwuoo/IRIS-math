@@ -9,6 +9,22 @@ def _default_credit_hints() -> Dict[str, float]:
     return {f"L{level_index}": 0.0 for level_index in range(7)}
 
 
+def _disabled_internal_heads(level_id: str) -> Dict[str, Dict[str, str]]:
+    if level_id == "L3":
+        return {
+            "branch_controller": {"status": "disabled"},
+            "budget_allocator": {"status": "disabled"},
+            "repair_scheduler": {"status": "disabled"},
+        }
+    if level_id == "L6":
+        return {
+            "verifier_aggregator": {"status": "disabled"},
+            "credit_router": {"status": "disabled"},
+            "calibration_head": {"status": "disabled"},
+        }
+    return {}
+
+
 class StubLevel(LevelInterface):
     def __init__(self, level_id: str, enabled: bool = False) -> None:
         super().__init__(level_id=level_id, enabled=enabled)
@@ -20,10 +36,20 @@ class StubLevel(LevelInterface):
                 "level": self.level_id,
                 "enabled": self.enabled,
                 "disabled": not self.enabled,
+                "implementation_status": "stub",
+                "invocation_outcome": "neutral_passthrough",
+                "target_summary": {
+                    "pf_task_type": level_input.state_in.PF.task_type,
+                    "pf_target_spec": level_input.state_in.PF.target_spec,
+                    "frontier_count": len(level_input.state_in.FR),
+                },
+                "emitted_object_refs": {"branch_ids": [], "subgoal_ids": [], "vs_ids": []},
+                "evidence_trigger_refs": [],
                 "confidence": 0.0,
                 "uncertainty": 0.0,
                 "failure_tags": [],
                 "credit_hints": _default_credit_hints(),
+                "internal_heads": _disabled_internal_heads(self.level_id),
             }
         )
         return LevelOutput(

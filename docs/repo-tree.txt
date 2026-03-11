@@ -1,5 +1,5 @@
 ﻿IRIS repository tree (snapshot)
-Generated: 2026-03-05
+Generated: 2026-03-10
 Omitted: *.tar, /data, *.json, /package, *.whl, /wheels, /.pytest_cache, /.venv-wsl-jax, /.venv-wsl-jax2, *.pyc, /packages, *.zip
 
 .
@@ -215,6 +215,11 @@ Omitted: *.tar, /data, *.json, /package, *.whl, /wheels, /.pytest_cache, /.venv-
     10_Glossary_and_Normative_Status.md
     11_Phase_D_Diagnostics_Design_Note.md
     12_Phase_E_Execution_Design_Note.md
+    13_Goals_and_Success_Criteria.md
+    14_Multimodal_Document_Pipeline.md
+    15_Benchmark_Registry_and_Tiering_Playbook.md
+    16_Verifier_and_Formalization_Stack.md
+    17_Scaling_Promotion_and_Readiness.md
     repo-tree.txt
     數學模型建議.md
   iris/

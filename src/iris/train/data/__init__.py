@@ -1,4 +1,16 @@
-﻿from .contracts import (
+from .policies import (
+    BenchmarkFamilyPolicy,
+    DataPolicyBundle,
+    DataRealizationPolicy,
+    DecontamPolicy,
+    PolicyValidationError,
+    ProvenanceManifest,
+    build_document_slice_id,
+    load_default_policy_bundle,
+    load_policy_bundle,
+    load_policy_bundle_for_profile,
+)
+from .contracts import (
     DatasetSourceSpec,
     FORBIDDEN_HF_PATHS,
     PURE_LM_RATIO_TOTAL,
@@ -13,6 +25,18 @@
 from .iterator import PureLMStreamingProvider, SourceManifest, TextBatch, deterministic_sampling_key
 from .planner import HybridSchedule, MicroStepPlan, SegmentPlan, build_hybrid_schedule, build_pure_lm_segment_plan
 from .qa_gate import enforce_qa_gate, evaluate_text_quality
+from .document_records import (
+    DocumentRecordValidationError,
+    MathDocumentProjection,
+    MathDocumentRecord,
+    MathDocumentSource,
+    load_math_document_projection,
+    load_math_document_record,
+    load_math_document_source,
+    validate_math_document_projection,
+    validate_math_document_record,
+    validate_math_document_source,
+)
 from .state_builder import text_to_state_ir
 from .token_accounting import (
     TokenLedger,
@@ -26,11 +50,21 @@ from .token_accounting import (
 )
 
 __all__ = [
+    "BenchmarkFamilyPolicy",
+    "DataPolicyBundle",
+    "DataRealizationPolicy",
     "DatasetSourceSpec",
+    "DecontamPolicy",
+    "DocumentRecordValidationError",
     "FORBIDDEN_HF_PATHS",
     "HybridSchedule",
+    "MathDocumentProjection",
+    "MathDocumentRecord",
+    "MathDocumentSource",
     "MicroStepPlan",
+    "PolicyValidationError",
     "PURE_LM_RATIO_TOTAL",
+    "ProvenanceManifest",
     "PureLMStreamingProvider",
     "REQUIRED_PURE_LM_SOURCE_COUNT",
     "ProfileValidationError",
@@ -41,13 +75,20 @@ __all__ = [
     "TokenLedger",
     "TokenizerError",
     "TokenizerHandle",
+    "build_document_slice_id",
     "build_hybrid_schedule",
     "build_pure_lm_segment_plan",
     "count_tokens",
     "deterministic_sampling_key",
     "enforce_qa_gate",
     "evaluate_text_quality",
+    "load_default_policy_bundle",
     "load_default_pure_lm_profile",
+    "load_math_document_projection",
+    "load_math_document_record",
+    "load_math_document_source",
+    "load_policy_bundle",
+    "load_policy_bundle_for_profile",
     "load_profile",
     "load_tokenizer_handle",
     "profile_sha256",
@@ -55,5 +96,8 @@ __all__ = [
     "text_to_state_ir",
     "tokenizer_fingerprint",
     "truncate_text_to_tokens",
+    "validate_math_document_projection",
+    "validate_math_document_record",
+    "validate_math_document_source",
     "validate_tokenizer_required",
 ]
