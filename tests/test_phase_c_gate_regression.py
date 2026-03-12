@@ -63,13 +63,25 @@ def test_build_concept_breakdown_from_minimal_conceptarc(tmp_path: Path) -> None
 
 def test_gate_context_uses_v2_mandatory_docs_sequence() -> None:
     docs = GateContext().mandatory_docs_consulted
-    assert docs[:4] == (
+    assert docs == (
         "docs/數學模型建議.md",
         "docs/00_INDEX.md",
         "docs/10_Glossary_and_Normative_Status.md",
+        "docs/13_Goals_and_Success_Criteria.md",
         "docs/07_Data_Constitution.md",
+        "docs/01_Architecture_Constitution.md",
+        "docs/02_State_IR_Spec.md",
+        "docs/03_Level_Contracts_L0-L6.md",
+        "docs/04_Credit_Assignment_and_Recovery.md",
+        "docs/05_Eval_Metrics_Spec.md",
+        "docs/06_Regression_and_Phase_Gates.md",
+        "docs/08_Training_Run_Governance.md",
+        "docs/09_Training_Profiles_and_Scaling.md",
+        "docs/14_Multimodal_Document_Pipeline.md",
+        "docs/15_Benchmark_Registry_and_Tiering_Playbook.md",
+        "docs/16_Verifier_and_Formalization_Stack.md",
+        "docs/17_Scaling_Promotion_and_Readiness.md",
     )
-    assert docs[-1] == "docs/09_Training_Profiles_and_Scaling.md"
 
 
 def test_build_paired_representation_diff_from_minimal_rearc(tmp_path: Path) -> None:

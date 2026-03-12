@@ -241,6 +241,14 @@ This matrix answers what may become train-visible for the currently registered f
 - derivative-family Tier 1 exposure is limited to structural labels, difficulty bands, and separately registered bounded proof-shape or process fragments
 - if a derivative family allows proof-shape or process fragments, it must also declare Tier 2 with `homology_axes` including `proof_pattern`
 
+**Derivative-family registration checklist**
+
+- attach explicit independence evidence such as source snapshot lineage, authorship basis, or independent curation note
+- attach a reformulation-leakage audit artifact against the original FrontierMath family before Tier 1 admission
+- declare author/source/project lineage in the firewall, not only topic or method cluster
+- keep original official statements, explanations, and checker traces outside train-visible curation even when derivative families exist
+- do not expose derivative-family Tier 2 observe-only metrics until registration artifacts are complete
+
 **Tier 3 strict held-out**
 
 - original FrontierMath remains the strict held-out surface even when a derivative family exists
@@ -272,6 +280,17 @@ Compatibility probes remain unchanged:
 - `tier1_train_visible_units`: `none`
 - no train-return path
 - not valid as primary math promotion evidence
+
+**Transition boundary**
+
+- ARC compatibility probes default to `observe_only` once active math-native concept-isolation and reformulation packets exist for the same regression axis
+- ARC probes may block promotion only when they expose drift that is also corroborated by active math-native surfaces
+- ARC probe improvement may not be cited as a sufficient positive signal for `P3` or `P4` promotion
+
+**Retirement trigger**
+
+- once two consecutive promotion packets show stable active math-native `S4/S5` coverage for the corresponding axis, ARC compatibility probes move to appendix-only reporting
+- by `P4`, ARC compatibility probes must not appear as a primary promotion surface
 
 ---
 
@@ -342,6 +361,7 @@ Examples:
 - homologous synthetic restatements.
 
 Derivative families must not be silently described as if the original benchmark remained untouched.
+They must also retain explicit independence and leakage-audit artifacts in the surrounding governance packet, even when those artifacts live outside the executable family object itself.
 
 ---
 

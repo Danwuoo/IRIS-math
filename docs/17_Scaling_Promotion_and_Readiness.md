@@ -98,6 +98,37 @@ Blockers:
 - scaling that outruns the verifier stack,
 - growth in model size without corresponding institution maturity.
 
+### 2.4 Consolidated Profile Gating Table
+
+This table is an operational shorthand for the active contracts in `docs/05`, `docs/06`, `docs/09`, `docs/13`, `docs/15`, and `docs/16`.
+It does not replace metric names, family-specific benchmark rules, or phase-suite activation rules.
+
+Interpretation rules:
+
+- Treat a profile as gate-passed only when the relevant active suites in `docs/06_Regression_and_Phase_Gates.md` pass under a fixed declared `baseline_id` and `tolerance_profile_id`.
+- Treat the profile-specific hard-gate metric bundles in `docs/05_Eval_Metrics_Spec.md` as the default surface sets for readiness review unless a stricter packet is declared.
+- Treat `tp_p1_bootstrap` through `tp_p4_bootstrap` in `docs/05_Eval_Metrics_Spec.md` as the default numeric tolerance profiles for routine promotion review unless a stricter profile is declared.
+- Treat benchmark rows below as posture summaries, not exceptions to the family-specific Tier 1 / Tier 2 / Tier 3 firewalls in `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
+- Treat outcome claims as invalid if they violate the success-model red lines in `docs/13_Goals_and_Success_Criteria.md`.
+
+| Profile | Minimum Institution State | Capability Gates That Must Be Alive | Benchmark Posture | Claim Boundary |
+| --- | --- | --- | --- | --- |
+| `P1` | `institution solved` loop is real: data constitution, benchmark tier disclosure, contamination audit, parser / formalizer / verifier provenance, regression artifacts, and `failure.credit` reporting all run stably | document parsing is materially useful rather than cosmetic; local validity and gap tracking are mounted enough to influence recovery or evaluation; false accept is not worsening; document grounding and provenance coverage remain stable | `AIMO`, `Omni-MATH`, and `miniF2F` may appear only through their registered tier policies; Tier 2 remains observe-only during tuning; original `FrontierMath` remains untouched strict held-out | may claim institution validity and useful document / verifier loop closure; must not claim frontier competitiveness, `AIMO private` strength, or final scaling recipe validity |
+| `P2` | `P1` institutions remain stable at the larger envelope; homologous split, paired reformulation, and benchmark disclosure machinery stay reproducible | strategy diversity, theorem reuse, OCR / layout robustness, partial formalization gains, and counterexample-probe usefulness improve without `failure.credit` collapse | Tier 2 aggregate gains must accompany any Tier 1-visible family gains; benchmark lock-in is a blocker; `FrontierMath` is still original-family strict held-out, with only separately registered derivative families allowed for train-visible use | may claim benchmark-adjacent generalization and partial formalization gains; must not claim `AIMO private-like` readiness or original `FrontierMath` strength |
+| `P3` | full governance loop survives harder scale: `S1-S8` artifacts, resume consistency, contamination audit, and provenance completeness remain stable | long-context proof handling, verifier-memory cooperation, and search / recovery gains are visible on hard tasks; formal bridge evidence is promotion-relevant; false accept remains controlled | `AIMO` private-like or post-cutoff held-out surfaces become meaningful only as post-lock evaluation; `Omni-MATH` and `miniF2F` must improve on held-out as well as homologous surfaces; original `FrontierMath` remains strict held-out | may claim frontier-readiness signals and non-trivial high-difficulty math competence; must not treat early frontier signals alone as sufficient justification for `120B` claims |
+| `P4` | institution maturity survives frontier scale: benchmark governance, contamination audit, document robustness, verifier maturity, provenance reproducibility, and stable failure distributions all remain informative | verifier stack is mature enough for frontier claims; long-context document and proof robustness remain stable under strong stress; false accept / false reject accounting stays actionable | only here may strict held-out frontier surfaces support headline outcome claims; `AIMO private`, `Omni-MATH`, `miniF2F`, and original `FrontierMath` still require homologous held-out support plus verifier evidence | this is the first profile where final outcome-facing goals such as `AIMO 3 private: 50/50` may be claimed, and only when they remain aligned with capability and system evidence |
+
+### 2.5 Default Promotion Packet
+
+Unless a stricter program rule is declared, a routine `P1 -> P2`, `P2 -> P3`, or `P3 -> P4` promotion packet should include:
+
+1. three consecutive gate-passed runs under the same declared `baseline_id` and `tolerance_profile_id`,
+2. the relevant hard-gate surface bundle from `docs/05_Eval_Metrics_Spec.md`,
+3. the matching bootstrap tolerance profile from `docs/05_Eval_Metrics_Spec.md` unless a stricter named profile was used,
+4. declared benchmark-family posture, including which families were Tier 1-visible and which surfaces were `observe_only`,
+5. verifier-maturity evidence sufficient for the claimed profile boundary, including the frontier hard-gate surfaces from `docs/16_Verifier_and_Formalization_Stack.md` when relevant,
+6. explicit residual blockers or open uncertainties, if any remain.
+
 ---
 
 ## 3. Institution Solved

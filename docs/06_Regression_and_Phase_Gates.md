@@ -110,6 +110,7 @@ Rules:
 1. Tolerances are fixed per `phase + tolerance_profile_id`.
 2. Tolerances cannot silently relax inside the same profile.
 3. Baseline changes must be explicitly documented.
+4. The bootstrap readiness defaults for `tp_p1_bootstrap` through `tp_p4_bootstrap` live in `docs/05_Eval_Metrics_Spec.md`; stricter packets may override them, looser packets must be explicitly named and justified.
 
 ---
 

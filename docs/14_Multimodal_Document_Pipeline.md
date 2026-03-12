@@ -227,6 +227,31 @@ Projection rules:
 2. Projection may summarize parser outputs, but raw unmanaged parser traces must not become semantic state.
 3. Diagram-derived relations remain candidate structure until later levels or verifiers strengthen them.
 
+### 6.2 Minimum Projection Payload by Slot
+
+Projection into a State IR slot is compliant only when the projection path can justify the slot's minimal semantic payload.
+
+Minimum expectations:
+
+- `PF`: emit task framing, target statement or target anchor neighborhood, and source anchors; if task type or output form is unresolved, keep that uncertainty explicit rather than silently fabricating a precise task contract
+- `SY`: emit surface form, scope clue, binding state, and anchor-backed symbol provenance; unresolved symbols must remain explicit instead of being dropped
+- `CG`: emit relation type, ordered arguments or anchor-backed placeholders, relation status, and source support; document- or diagram-derived relations default to `candidate` unless stronger support exists
+- `FR`: seed only branch / subgoal / obligation structure that is actually supported by theorem, proof, exercise, or derivation units; sparse `FR` is preferable to invented proof search state
+- `LM`: seed only cited local lemmas, local definitions, or retrieval candidates that carry provenance and at least an `unchecked` applicability audit
+- `VS`: seed only provenance-bearing parser or verifier warnings as local-validity or gap-style evidence; parse confidence alone is not proof-validity evidence
+- `CS`: seed only document-conditioned control intent such as `continue`, `reparse`, or escalation due to unresolved regions; parser heuristics must not masquerade as full solver policy
+
+### 6.3 Projection Freeze Rules
+
+Each task-specific projection path must declare which slots it is authoritative enough to seed.
+
+Rules:
+
+1. Slots that are not authoritatively seeded must remain empty, sparse, or explicitly draft-like rather than being hallucinated into completeness.
+2. Cross-page or cross-anchor relationships may not be collapsed into a clean single-block summary if that would destroy anchor provenance.
+3. Candidate and unresolved status must be preserved through projection whenever parser confidence or semantic support is incomplete.
+4. Projection-time convenience transforms must not erase the distinction between source-grounded structure and later verifier-upgraded structure.
+
 ### 6.1 Diagram Candidate Promotion Rule
 
 Diagram relations enter the canonical record first as candidate relations.

@@ -458,6 +458,16 @@ Once a benchmark family has any Tier 1 train-visible exposure, the following def
 - repeated adaptive prompt, decoding, or hyperparameter sweeps against the same Tier 2 split,
 - importing Tier 2 or Tier 3 misses back into train-visible curation without a newly declared benchmark family policy or derivative-family policy.
 
+### 3.3.2 Derivative-Family Registration for Tier-3-Only Original Families
+
+If an original benchmark family remains `Tier 3`-only while a separate derivative family is allowed to become train-visible:
+
+- the derivative family must carry its own `benchmark_family_id` and executable `benchmark_family_policy/v1`,
+- the derivative family must retain independence evidence in governance artifacts, such as source snapshot identity, authorship basis, or separate curation lineage,
+- a reformulation-leakage audit against the original `Tier 3` family is required before Tier 1 admission,
+- original statements, official solutions, checker traces, and proof traces remain blocked from train-visible use,
+- derivative-family Tier 2 observe-only metrics remain non-compliant until the derivative policy and leakage-audit artifact are both declared.
+
 ---
 
 ## 4. Contamination and Decontamination Rules

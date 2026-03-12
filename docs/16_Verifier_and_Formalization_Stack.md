@@ -196,6 +196,28 @@ The verifier stack is considered materially mature only when:
 
 This maturity is a prerequisite for frontier-facing scaling claims.
 
+### 6.1 Frontier-Claim Hard Gate Surfaces
+
+For `P3 -> P4` promotion or any outcome-facing frontier claim, verifier maturity must be demonstrated on explicit hard-gate surfaces rather than narrative summary alone.
+
+Minimum hard-gate surfaces:
+
+- `task.proof_validity_score`
+- `eval.false_accept_rate`
+- `eval.false_reject_rate`
+- `eval.calibration_error`
+- `eval.counterexample_hit_rate`
+- `failure.credit.collapse_rate`
+- `provenance.verifier_coverage`
+- `provenance.formalizer_coverage` when the formal bridge participates in the claim
+
+Rules:
+
+1. A frontier score increase does not count as readiness if `eval.false_accept_rate` worsens beyond the declared tolerance profile.
+2. Formal-bridge evidence may not support a frontier claim while remaining `partial_mount` on the claimed surface.
+3. Counterexample utility may not be replaced by unverifiable self-consistency or majority-vote heuristics.
+4. The readiness packet must report these surfaces on at least one proof-bearing held-out family and one reformulated or document-grounded held-out slice relevant to the claim.
+
 ---
 
 ## 7. Explicit Non-Goals

@@ -180,7 +180,75 @@ These remain the highest-priority gate inputs:
 | `contam.strict_holdout_leakage_score` | Strict held-out leakage must stay bounded |
 | `provenance.parser_coverage` | Parser provenance coverage must not silently disappear |
 
+### 7.1 Bootstrap Profile Hard-Gate Surface Sets
+
+This subsection names the canonical metric bundles that profile-readiness documents may treat as hard-blocking surfaces.
+It does **not** activate suites or assign numeric tolerances on its own.
+
+Rules:
+
+1. A declared `baseline_id` and `tolerance_profile_id` must stay fixed across the compared promotion packet.
+2. No profile may satisfy its bundle by silently substituting benchmark score for the listed supporting surfaces.
+3. If a listed surface is not applicable, the run artifact must state why it is inapplicable and what authoritative replacement surface was used.
+
+| Profile | Minimum hard-gate surfaces | Required directionality |
+| --- | --- | --- |
+| `P1` | `rep.document.parse_completeness`, `task.document_grounding_score`, `failure.credit.collapse_rate`, `eval.false_accept_rate`, `eval.calibration_error`, `contam.strict_holdout_leakage_score`, `provenance.parser_coverage`, `provenance.verifier_coverage` | parsing and grounding must show material utility; false accept and calibration may not regress; leakage and provenance must remain within declared tolerance |
+| `P2` | all `P1` surfaces plus `prog.diversity`, `paired.invariance.gap`, `paired.asymmetry_rate`, `benchmark.tier2.generalization_gap`, `eval.counterexample_hit_rate` | strategy diversity must rise or remain stable; paired robustness may not regress; homologous held-out gap must not widen beyond tolerance; counterexample probing must become more useful, not less |
+| `P3` | all `P2` surfaces plus `task.proof_validity_score`, `search.recovery_precision`, `search.termination_margin`, `mem.applicability_precision`, `provenance.formalizer_coverage` when formal bridge is active | proof validity, recovery targeting, and applicability audit must improve or stay stable on harder held-out tasks; early-stop masking and provenance loss are blockers |
+| `P4` | all `P3` surfaces plus `task.validity_score`, `benchmark.tier3.frontier_success_rate`, `eval.false_reject_rate`, and frontier-slice `task.document_grounding_score` on document-native held-out tasks | strict held-out frontier success may rise only while all supporting verifier/governance surfaces remain green; false accept and false reject must both remain actionable and bounded by the declared tolerance profile |
+
 If outcome improves while primary gate signals regress, the change is treated as a regression.
+
+### 7.2 Bootstrap Tolerance Profiles
+
+This subsection supplies the default numeric tolerance profiles used by routine readiness review.
+These defaults apply only when no stricter benchmark-family, verifier-family, or phase packet rule has been declared.
+
+Normalization rule:
+
+- unless a metric family declares otherwise, rates and scores are interpreted on a normalized `[0, 1]` scale,
+- default deltas below are expressed in absolute percentage points (`pp`) on that normalized scale,
+- a `+1.0 pp` improvement therefore means `+0.01` absolute.
+
+`tp_p1_bootstrap`
+
+- `rep.document.parse_completeness`: must remain `>= 0.97` and may not drop by more than `0.5 pp` from baseline.
+- `task.document_grounding_score`: must improve by at least `+1.0 pp` over baseline on the declared document-native slice.
+- `failure.credit.collapse_rate`: must remain `<= 0.02` and may not worsen by more than `0.5 pp`.
+- `eval.false_accept_rate`: may not worsen by more than `0.25 pp`.
+- `eval.calibration_error`: may not worsen by more than `0.5 pp`.
+- `contam.strict_holdout_leakage_score`: may not worsen beyond the declared audit uncertainty band; absent a stricter family rule, treat any increase greater than `0.1 pp` as blocking.
+- `provenance.parser_coverage`: must remain `>= 0.95` and may not drop by more than `1.0 pp`.
+- `provenance.verifier_coverage`: when verifier-conditioned evaluation is active, must remain `>= 0.90` and may not drop by more than `1.0 pp`.
+
+`tp_p2_bootstrap`
+
+- inherits all `tp_p1_bootstrap` constraints,
+- `prog.diversity`: may not worsen by more than `1.0 pp`,
+- `paired.invariance.gap`: may not widen by more than `1.0 pp`,
+- `paired.asymmetry_rate`: may not worsen by more than `1.0 pp`,
+- `benchmark.tier2.generalization_gap`: may not widen by more than `1.0 pp`,
+- `eval.counterexample_hit_rate`: must improve by at least `+1.0 pp`.
+
+`tp_p3_bootstrap`
+
+- inherits all `tp_p2_bootstrap` constraints,
+- `task.proof_validity_score`: must improve by at least `+1.0 pp`,
+- `search.recovery_precision`: must improve by at least `+1.0 pp`,
+- `search.termination_margin`: may not worsen by more than `0.5 pp`,
+- `mem.applicability_precision`: may not worsen by more than `1.0 pp`,
+- `provenance.formalizer_coverage`: when the formal bridge is active, must remain `>= 0.80` and may not drop by more than `1.0 pp`.
+
+`tp_p4_bootstrap`
+
+- inherits all `tp_p3_bootstrap` constraints,
+- `task.validity_score`: must improve by at least `+1.0 pp`,
+- `benchmark.tier3.frontier_success_rate`: must improve by at least `+1.0 pp`,
+- `eval.false_reject_rate`: may not worsen by more than `0.5 pp`,
+- frontier-slice `task.document_grounding_score`: must improve by at least `+1.0 pp` on declared document-native held-out tasks.
+
+If a program needs looser thresholds than these bootstrap defaults, the looser profile must be explicitly named, justified, and retained as a separate `tolerance_profile_id`.
 
 ---
 
