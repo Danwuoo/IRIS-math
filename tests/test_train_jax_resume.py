@@ -42,7 +42,7 @@ def test_pre_commit_crash_resume_keeps_single_applied_event(tmp_path: Path) -> N
         device="cpu",
         backend="jax",
         strict_jax=True,
-        level_impl="mounted",
+        level_impl="jax_transition",
         crash_point="pre_commit",
         crash_segment=0,
     )
@@ -56,7 +56,7 @@ def test_pre_commit_crash_resume_keeps_single_applied_event(tmp_path: Path) -> N
         device="cpu",
         backend="jax",
         strict_jax=True,
-        level_impl="mounted",
+        level_impl="jax_transition",
     )
     summary = run_toy_training(resume_config)
     assert summary["status"] == "Done"
@@ -74,8 +74,9 @@ def test_pre_commit_crash_resume_keeps_single_applied_event(tmp_path: Path) -> N
     assert "created_at" in runtime_manifest
     applied_event = applied_segment0[0]
     assert applied_event["policy_bundle_sha256"]
-    assert applied_event["data_realization_policy_id"] == "p1-bootstrap-b-v2"
+    assert applied_event["data_realization_policy_id"] == "p1-bootstrap-c-v1"
     assert applied_event["decontam_policy_id"] == "global-decontam-v2"
+    assert applied_event["learning_objective_bundle_id"] == "p1-phase-c-bundle-v1"
     assert applied_event["parser_provenance_id"] == "math-doc-pipeline-v1"
     assert applied_event["formalizer_provenance_id"] == "formalizer-skeleton-v1"
     assert applied_event["verifier_provenance_id"] == "verifier-stack-v1"
@@ -88,7 +89,8 @@ def test_pre_commit_crash_resume_keeps_single_applied_event(tmp_path: Path) -> N
     assert metrics_record["code_version_hash"]
     assert metrics_record["config_hash"]
     assert metrics_record["policy_bundle_sha256"]
-    assert metrics_record["data_realization_policy_id"] == "p1-bootstrap-b-v2"
+    assert metrics_record["data_realization_policy_id"] == "p1-bootstrap-c-v1"
+    assert metrics_record["learning_objective_bundle_id"] == "p1-phase-c-bundle-v1"
     assert metrics_record["parser_provenance_refs"]["semantic_unit_typer_manifest_id"] == "semantic-unit-typer-v1"
 
     checkpoint = load_checkpoint(Path(applied_event["checkpoint_ref"]))
@@ -96,7 +98,8 @@ def test_pre_commit_crash_resume_keeps_single_applied_event(tmp_path: Path) -> N
     assert checkpoint["policy_bundle_sha256"] == applied_event["policy_bundle_sha256"]
     assert checkpoint["profile_id"] == "P1"
     assert checkpoint["phase"] == "C"
-    assert checkpoint["data_realization_policy_id"] == "p1-bootstrap-b-v2"
+    assert checkpoint["data_realization_policy_id"] == "p1-bootstrap-c-v1"
+    assert checkpoint["learning_objective_bundle_id"] == "p1-phase-c-bundle-v1"
     assert checkpoint["parser_provenance_id"] == "math-doc-pipeline-v1"
     assert checkpoint["formalizer_provenance_id"] == "formalizer-skeleton-v1"
     assert checkpoint["verifier_provenance_id"] == "verifier-stack-v1"
@@ -120,7 +123,7 @@ def test_runtime_lock_manifest_can_be_pinned_across_runs(tmp_path: Path) -> None
             device="cpu",
             backend="jax",
             strict_jax=True,
-            level_impl="mounted",
+            level_impl="jax_transition",
             runtime_lock_manifest_path=pinned_manifest_path,
         )
         summary = run_toy_training(config)

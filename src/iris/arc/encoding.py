@@ -8,6 +8,7 @@ from typing import List, Sequence, Tuple
 import numpy as np
 
 from ..schema import (
+    AdjudicationState,
     ApplicabilityAudit,
     Branch,
     BudgetState,
@@ -262,8 +263,13 @@ def encode_arc_case_to_state(
                 action_status="selected",
             ),
             budget_state=BudgetState(global_step_budget_remaining=1),
+            runtime_status="in_progress",
             uncertainty_state="arc_estimate",
             escalation_state="inactive",
+            adjudication_state=AdjudicationState(
+                task_adjudication_policy_id="task-family-counterexample-or-construction-default-v1",
+                adjudication_status="pending",
+            ),
             vector=global_token,
         ),
     )

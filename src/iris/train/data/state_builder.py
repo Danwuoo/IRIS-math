@@ -5,6 +5,7 @@ from typing import Any, Sequence
 import numpy as np
 
 from ...schema import (
+    AdjudicationState,
     ApplicabilityAudit,
     Branch,
     BudgetState,
@@ -195,8 +196,13 @@ def text_to_state_ir(
             budget_state=BudgetState(
                 global_step_budget_remaining=max(int(max_input_tokens) - len(token_ids), 0)
             ),
+            runtime_status="in_progress",
             uncertainty_state="estimated",
             escalation_state="inactive",
+            adjudication_state=AdjudicationState(
+                task_adjudication_policy_id="task-family-proof-natural-language-default-v1",
+                adjudication_status="pending",
+            ),
             vector=g_section[0],
         ),
     )

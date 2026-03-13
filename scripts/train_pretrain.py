@@ -27,7 +27,7 @@ def main() -> int:
     parser.add_argument("--tokens-per-micro-step", type=int, default=256)
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--backend", type=str, default="jax", choices=["jax"])
-    parser.add_argument("--level-impl", type=str, default="mounted", choices=["mounted"])
+    parser.add_argument("--level-impl", type=str, default="jax_transition", choices=["mounted", "jax_transition"])
     parser.add_argument("--strict-jax", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--level-alpha", type=float, default=0.1)
     parser.add_argument(

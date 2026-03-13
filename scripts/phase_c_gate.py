@@ -104,14 +104,14 @@ def main() -> int:
     parser.add_argument(
         "--conceptarc-corpus",
         type=Path,
-        default=Path("tools/ConceptARC/corpus"),
-        help="ConceptARC corpus root directory.",
+        default=Path("tests/fixtures/p1_phase_c/regression/concepts"),
+        help="Math-native concept-isolation regression corpus root directory.",
     )
     parser.add_argument(
         "--rearc-tasks",
         type=Path,
-        default=Path("data/arc/re_arc/tasks"),
-        help="re_arc task directory.",
+        default=Path("tests/fixtures/p1_phase_c/regression/pairs"),
+        help="Math-native paired reformulation regression directory.",
     )
     parser.add_argument(
         "--rearc-max-tasks",

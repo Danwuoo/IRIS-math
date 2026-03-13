@@ -3,12 +3,17 @@ from .policies import (
     DataPolicyBundle,
     DataRealizationPolicy,
     DecontamPolicy,
+    P1RecordAdmission,
     PolicyValidationError,
     ProvenanceManifest,
+    TrainVisibleRecord,
+    admit_p1_train_visible_record,
     build_document_slice_id,
     load_default_policy_bundle,
     load_policy_bundle,
     load_policy_bundle_for_profile,
+    load_policy_bundle_for_profile_phase,
+    validate_train_visible_record,
 )
 from .contracts import (
     DatasetSourceSpec,
@@ -37,6 +42,7 @@ from .document_records import (
     validate_math_document_record,
     validate_math_document_source,
 )
+from .document_pipeline import DocumentPipelineBundle, DocumentPipelineError, build_document_pipeline_bundle
 from .state_builder import text_to_state_ir
 from .token_accounting import (
     TokenLedger,
@@ -55,6 +61,8 @@ __all__ = [
     "DataRealizationPolicy",
     "DatasetSourceSpec",
     "DecontamPolicy",
+    "DocumentPipelineBundle",
+    "DocumentPipelineError",
     "DocumentRecordValidationError",
     "FORBIDDEN_HF_PATHS",
     "HybridSchedule",
@@ -62,6 +70,7 @@ __all__ = [
     "MathDocumentRecord",
     "MathDocumentSource",
     "MicroStepPlan",
+    "P1RecordAdmission",
     "PolicyValidationError",
     "PURE_LM_RATIO_TOTAL",
     "ProvenanceManifest",
@@ -73,8 +82,11 @@ __all__ = [
     "SourceManifest",
     "TextBatch",
     "TokenLedger",
+    "TrainVisibleRecord",
     "TokenizerError",
     "TokenizerHandle",
+    "admit_p1_train_visible_record",
+    "build_document_pipeline_bundle",
     "build_document_slice_id",
     "build_hybrid_schedule",
     "build_pure_lm_segment_plan",
@@ -89,6 +101,7 @@ __all__ = [
     "load_math_document_source",
     "load_policy_bundle",
     "load_policy_bundle_for_profile",
+    "load_policy_bundle_for_profile_phase",
     "load_profile",
     "load_tokenizer_handle",
     "profile_sha256",
@@ -99,5 +112,6 @@ __all__ = [
     "validate_math_document_projection",
     "validate_math_document_record",
     "validate_math_document_source",
+    "validate_train_visible_record",
     "validate_tokenizer_required",
 ]

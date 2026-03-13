@@ -20,11 +20,11 @@ from flax import serialization as flax_serialization
 
 from ..levels import LEVEL_IDS, apply_level_stack_params, init_level_stack_params
 from ..metrics import append_jsonl, build_canonical_metrics, neutral_failure_credit
-from ..runtime import assert_jax_runtime
+from ..runtime import assert_jax_runtime, resolve_task_semantics
 from ..schema import STATE_IR_TOKEN_ORDER
 from ..trunk import build_typed_sequence, forward_with_params, init_trunk_params
 from .checkpoint import load_checkpoint, save_checkpoint_atomic
-from .data import load_policy_bundle_for_profile
+from .data import load_policy_bundle_for_profile_phase
 from .data.contracts import load_default_pure_lm_profile, load_profile
 from .data.iterator import PureLMStreamingProvider, deterministic_sampling_key
 from .data.planner import build_hybrid_schedule
@@ -36,6 +36,7 @@ from .data.token_accounting import (
     validate_tokenizer_required,
 )
 from .journal import APPLIED, PENDING, append_journal_event, journal_head_hash, load_journal, resolve_resume_pointer
+from .objectives import resolve_learning_objective_bundle
 from .synthetic import dataset_slice_id_for_segment, generate_synthetic_state
 
 
@@ -170,7 +171,11 @@ def _manifest_build_id(manifest: Any | None) -> str:
 
 
 def _active_governance_snapshot(config: "ToyTrainConfig") -> Dict[str, Any]:
-    bundle = load_policy_bundle_for_profile(config.policy_profile_id)
+    bundle = load_policy_bundle_for_profile_phase(config.policy_profile_id, config.phase)
+    learning_bundle, learning_bundle_resolution_source = resolve_learning_objective_bundle(
+        profile_id=str(config.policy_profile_id),
+        phase=str(config.phase),
+    )
     manifests = bundle.provenance_manifests
     parser_manifest = manifests.get("math-doc-pipeline-v1")
     layout_manifest = manifests.get("layout-parser-v1")
@@ -185,6 +190,8 @@ def _active_governance_snapshot(config: "ToyTrainConfig") -> Dict[str, Any]:
         "policy_bundle_sha256": bundle.bundle_sha256,
         "data_realization_policy_id": bundle.data_realization_policy.data_realization_policy_id,
         "decontam_policy_id": bundle.decontam_policy.decontam_policy_id,
+        "learning_objective_bundle_id": learning_bundle.learning_objective_bundle_id,
+        "learning_objective_bundle_resolution_source": learning_bundle_resolution_source,
         "benchmark_family_policy_refs": list(bundle.data_realization_policy.benchmark_family_policy_refs),
         "parser_provenance_id": getattr(parser_manifest, "manifest_id", "not_applicable"),
         "parser_provenance_refs": {
@@ -203,6 +210,7 @@ def _active_governance_snapshot(config: "ToyTrainConfig") -> Dict[str, Any]:
         "formalizer_version": _manifest_version(formalizer_manifest),
         "verifier_provenance_id": getattr(verifier_manifest, "manifest_id", "not_applicable"),
         "verifier_build_id": _manifest_build_id(verifier_manifest),
+        "learning_objective_bundle_sha256": _stable_hash(learning_bundle.__dict__),
     }
 
 
@@ -295,7 +303,7 @@ class ToyTrainConfig:
     tolerance_profile_id: str = "toy-default"
     backend: str = "jax"
     strict_jax: bool = True
-    level_impl: str = "mounted"
+    level_impl: str = "jax_transition"
     level_alpha: float = 0.1
     crash_point: str = "none"
     crash_segment: int = -1
@@ -325,8 +333,8 @@ class ToyTrainConfig:
 def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
     if config.backend != "jax":
         raise RuntimeError("Strict JAX mode requires --backend jax.")
-    if config.level_impl != "mounted":
-        raise RuntimeError("Phase C.1 main path requires --level-impl mounted.")
+    if config.level_impl not in {"jax_transition", "mounted"}:
+        raise RuntimeError("Toy training requires --level-impl jax_transition.")
     data_source = str(config.data_source).strip().lower()
     if data_source not in {"synthetic", "pure_lm_streaming", "hybrid_mixture"}:
         raise RuntimeError(
@@ -483,7 +491,32 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
                 "phase": governance["phase"],
                 "data_realization_policy_id": governance["data_realization_policy_id"],
                 "decontam_policy_id": governance["decontam_policy_id"],
+                "learning_objective_bundle_id": governance["learning_objective_bundle_id"],
+                "learning_objective_bundle_resolution_source": governance["learning_objective_bundle_resolution_source"],
+                "learning_objective_bundle_sha256": governance["learning_objective_bundle_sha256"],
                 "benchmark_family_policy_refs": governance["benchmark_family_policy_refs"],
+                "task_family": checkpoint_task_semantics.task_family if checkpoint_task_semantics is not None else "",
+                "task_family_resolution_source": (
+                    checkpoint_task_semantics.task_family_resolution_source
+                    if checkpoint_task_semantics is not None
+                    else ""
+                ),
+                "task_adjudication_policy_id": (
+                    checkpoint_task_semantics.task_adjudication_policy_id
+                    if checkpoint_task_semantics is not None
+                    else ""
+                ),
+                "task_adjudication_policy_resolution_source": (
+                    checkpoint_task_semantics.task_adjudication_policy_resolution_source
+                    if checkpoint_task_semantics is not None
+                    else ""
+                ),
+                "runtime_status": last_state.CS.runtime_status if last_state is not None else "in_progress",
+                "adjudication_status": (
+                    last_state.CS.adjudication_state.adjudication_status
+                    if last_state is not None and last_state.CS.adjudication_state is not None
+                    else "pending"
+                ),
                 "parser_provenance_id": governance["parser_provenance_id"],
                 "parser_provenance_refs": governance["parser_provenance_refs"],
                 "parse_config_fingerprint": governance["parse_config_fingerprint"],
@@ -640,6 +673,7 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
         rng_state["rng.control.train"] = int(rng_state["rng.control.train"]) + 1
         rng_state["rng.data.train"] = int(rng_state["rng.data.train"]) + 1
         rng_hash_post = _stable_hash(rng_state)
+        checkpoint_task_semantics = resolve_task_semantics(last_state.PF) if last_state is not None else None
 
         current_events = load_journal(journal_path)
         checkpoint_payload = {
@@ -664,7 +698,32 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
             "runtime_lock_manifest_sha256": runtime_lock["runtime_lock_manifest_sha256"],
             "data_realization_policy_id": governance["data_realization_policy_id"],
             "decontam_policy_id": governance["decontam_policy_id"],
+            "learning_objective_bundle_id": governance["learning_objective_bundle_id"],
+            "learning_objective_bundle_resolution_source": governance["learning_objective_bundle_resolution_source"],
+            "learning_objective_bundle_sha256": governance["learning_objective_bundle_sha256"],
             "benchmark_family_policy_refs": governance["benchmark_family_policy_refs"],
+            "task_family": checkpoint_task_semantics.task_family if checkpoint_task_semantics is not None else "",
+            "task_family_resolution_source": (
+                checkpoint_task_semantics.task_family_resolution_source
+                if checkpoint_task_semantics is not None
+                else ""
+            ),
+            "task_adjudication_policy_id": (
+                checkpoint_task_semantics.task_adjudication_policy_id
+                if checkpoint_task_semantics is not None
+                else ""
+            ),
+            "task_adjudication_policy_resolution_source": (
+                checkpoint_task_semantics.task_adjudication_policy_resolution_source
+                if checkpoint_task_semantics is not None
+                else ""
+            ),
+            "runtime_status": last_state.CS.runtime_status if last_state is not None else "in_progress",
+            "adjudication_status": (
+                last_state.CS.adjudication_state.adjudication_status
+                if last_state is not None and last_state.CS.adjudication_state is not None
+                else "pending"
+            ),
             "parser_provenance_id": governance["parser_provenance_id"],
             "parser_provenance_refs": governance["parser_provenance_refs"],
             "parse_config_fingerprint": governance["parse_config_fingerprint"],
@@ -694,6 +753,8 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
                 "policy_bundle_sha256": governance["policy_bundle_sha256"],
                 "data_realization_policy_id": governance["data_realization_policy_id"],
                 "decontam_policy_id": governance["decontam_policy_id"],
+                "learning_objective_bundle_id": governance["learning_objective_bundle_id"],
+                "learning_objective_bundle_resolution_source": governance["learning_objective_bundle_resolution_source"],
                 "benchmark_family_policy_refs": governance["benchmark_family_policy_refs"],
                 "parser_provenance_id": governance["parser_provenance_id"],
                 "parser_provenance_refs": governance["parser_provenance_refs"],
@@ -735,7 +796,16 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
                 "phase": governance["phase"],
                 "data_realization_policy_id": governance["data_realization_policy_id"],
                 "decontam_policy_id": governance["decontam_policy_id"],
+                "learning_objective_bundle_id": governance["learning_objective_bundle_id"],
+                "learning_objective_bundle_resolution_source": governance["learning_objective_bundle_resolution_source"],
+                "learning_objective_bundle_sha256": governance["learning_objective_bundle_sha256"],
                 "benchmark_family_policy_refs": governance["benchmark_family_policy_refs"],
+                "task_family": "",
+                "task_family_resolution_source": "",
+                "task_adjudication_policy_id": "",
+                "task_adjudication_policy_resolution_source": "",
+                "runtime_status": "in_progress",
+                "adjudication_status": "pending",
                 "parser_provenance_id": governance["parser_provenance_id"],
                 "parser_provenance_refs": governance["parser_provenance_refs"],
                 "parse_config_fingerprint": governance["parse_config_fingerprint"],
@@ -777,6 +847,7 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
                 level_id: float(np.asarray(l6_credit_arr[index]))
                 for index, level_id in enumerate(LEVEL_IDS)
             }
+            task_semantics = resolve_task_semantics(state_out.PF)
             metrics = build_canonical_metrics(
                 state=state_out,
                 failure_credit=l6_credit or neutral_failure_credit(),
@@ -806,6 +877,8 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
                     "phase": governance["phase"],
                     "data_realization_policy_id": governance["data_realization_policy_id"],
                     "decontam_policy_id": governance["decontam_policy_id"],
+                    "learning_objective_bundle_id": governance["learning_objective_bundle_id"],
+                    "learning_objective_bundle_resolution_source": governance["learning_objective_bundle_resolution_source"],
                     "benchmark_family_policy_refs": governance["benchmark_family_policy_refs"],
                     "parser_provenance_id": governance["parser_provenance_id"],
                     "parser_provenance_refs": governance["parser_provenance_refs"],
@@ -817,6 +890,16 @@ def run_toy_training(config: ToyTrainConfig) -> Dict[str, Any]:
                     "formalizer_version": governance["formalizer_version"],
                     "verifier_provenance_id": governance["verifier_provenance_id"],
                     "verifier_build_id": governance["verifier_build_id"],
+                    "task_family": task_semantics.task_family,
+                    "task_family_resolution_source": task_semantics.task_family_resolution_source,
+                    "task_adjudication_policy_id": task_semantics.task_adjudication_policy_id,
+                    "task_adjudication_policy_resolution_source": task_semantics.task_adjudication_policy_resolution_source,
+                    "runtime_status": state_out.CS.runtime_status,
+                    "adjudication_status": (
+                        state_out.CS.adjudication_state.adjudication_status
+                        if state_out.CS.adjudication_state is not None
+                        else "pending"
+                    ),
                     "code_version_hash": code_version_hash,
                     "config_hash": config_hash,
                     "trunk.backend": "jax",

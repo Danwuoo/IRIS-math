@@ -234,6 +234,55 @@ When the slice is document-derived or verifier-derived, the effective slice iden
 - formalizer provenance id,
 - verifier provenance id.
 
+### 8.1 Hugging Face Dataset Streaming Policy
+
+For large Hugging Face-hosted corpora in `P1-P3`, dataset streaming is the default access posture when the source is either:
+
+- directly train-visible text / semi-formal data, or
+- a canonicalized local snapshot derived from document-native raw sources.
+
+Rules:
+
+1. Every streamed source must resolve a source manifest that includes at least:
+   - `source_id`,
+   - `hf_path`,
+   - `hf_name` or equivalent config name when one exists,
+   - `split`,
+   - immutable `revision`,
+   - logical payload field such as `text`, `problem`, `formal_statement`, or canonical record payload field,
+   - declared license / attribution state,
+   - any filter signature that materially changes the admitted slice,
+   - local snapshot pattern when `local_snapshot` mode is allowed.
+2. Mutable references such as `main`, `latest`, or an unpinned branch name are not governance-complete revisions for a committed run.
+   Use a commit SHA, immutable snapshot id, or equivalent stable dataset revision.
+3. `hf_online` and `local_snapshot` are both allowed, but they are only equivalent when they resolve to the same manifested dataset identity and revision.
+4. Automatic fallback from `hf_online` to `local_snapshot` is allowed only when the fallback preserves the same source manifest semantics.
+   The requested mode and effective mode must both be persisted.
+5. Raw `PDF`, `DOCX`, `image`, or `scanned_note` sources hosted via Hugging Face are not directly train-visible through a text-only streaming path.
+   They must first become canonical records under `docs/07_Data_Constitution.md` and `docs/14_Multimodal_Document_Pipeline.md`.
+6. Streaming does not waive benchmark-family firewalls, decontamination, or provenance obligations.
+
+### 8.2 Streaming Identity and Persistence Requirements
+
+When a run uses dataset streaming, `dataset_slice_id` must remain stable with respect to:
+
+- source manifest sha or equivalent immutable source-manifest digest,
+- the ordered set of source ids included in the slice,
+- declared filter signature,
+- streaming mode requested,
+- streaming mode effective,
+- `data_seed`,
+- `segment_id`,
+- `micro_step_idx`.
+
+For streaming-backed runs, the journal, checkpoint, or equivalent committed run artifact must preserve enough information to replay the source choice, including:
+
+- source manifest ref or sha,
+- streaming mode requested,
+- streaming mode effective,
+- local snapshot manifest ref when `local_snapshot` is used,
+- any canonicalization or packing manifest ref when raw document sources were normalized before streaming.
+
 ---
 
 ## 9. Runtime Lock Policy

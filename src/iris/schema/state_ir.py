@@ -7,6 +7,55 @@ import numpy as np
 
 STATE_IR_SLOT_ORDER: Tuple[str, ...] = ("PF", "SY", "CG", "FR", "LM", "VS", "CS")
 STATE_IR_TOKEN_ORDER: Tuple[str, ...] = STATE_IR_SLOT_ORDER
+CANONICAL_SCOPE_KINDS: Tuple[str, ...] = ("problem_global", "branch_local", "quote_local")
+CANONICAL_SCOPE_KIND_ALIASES: Dict[str, str] = {
+    "global": "problem_global",
+    "problem": "problem_global",
+    "branch": "branch_local",
+    "quote": "quote_local",
+}
+CANONICAL_ACTION_TYPES: Tuple[str, ...] = (
+    "continue",
+    "backtrack",
+    "reparse",
+    "switch_strategy",
+    "stop",
+)
+CANONICAL_ACTION_TYPE_ALIASES: Dict[str, str] = {
+    "switch": "switch_strategy",
+    "retry": "reparse",
+    "halt": "stop",
+}
+CANONICAL_RUNTIME_STATUSES: Tuple[str, ...] = (
+    "in_progress",
+    "candidate_ready",
+    "accepted",
+    "rejected",
+    "abstained",
+    "budget_exhausted",
+)
+CANONICAL_RUNTIME_STATUS_ALIASES: Dict[str, str] = {
+    "running": "in_progress",
+    "done": "candidate_ready",
+    "need_more_check": "candidate_ready",
+    "accepted_with_low_margin": "accepted",
+    "fail": "rejected",
+    "failed": "rejected",
+    "timeout": "budget_exhausted",
+}
+CANONICAL_ADJUDICATION_STATUSES: Tuple[str, ...] = (
+    "pending",
+    "ready",
+    "accepted",
+    "rejected",
+    "abstained",
+    "blocked",
+)
+CANONICAL_ADJUDICATION_STATUS_ALIASES: Dict[str, str] = {
+    "need_more_check": "pending",
+    "in_review": "ready",
+    "fail": "rejected",
+}
 
 
 class StateIRValidationError(ValueError):
@@ -43,6 +92,22 @@ def _require_text(field_name: str, value: str) -> str:
     return text
 
 
+def _normalize_choice(
+    field_name: str,
+    value: str,
+    *,
+    allowed: Sequence[str],
+    aliases: Mapping[str, str] | None = None,
+) -> str:
+    text = _require_text(field_name, value)
+    canonical = dict(aliases or {}).get(text, text)
+    if canonical not in set(allowed):
+        raise StateIRValidationError(
+            f"{field_name} must be one of {tuple(allowed)}, got {canonical!r}."
+        )
+    return canonical
+
+
 @dataclass(frozen=True)
 class StateRef:
     slot: str
@@ -63,7 +128,16 @@ class ScopeRef:
     parent_scope_id: str | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "scope_kind", _require_text("scope_ref.scope_kind", self.scope_kind))
+        object.__setattr__(
+            self,
+            "scope_kind",
+            _normalize_choice(
+                "scope_ref.scope_kind",
+                self.scope_kind,
+                allowed=CANONICAL_SCOPE_KINDS,
+                aliases=CANONICAL_SCOPE_KIND_ALIASES,
+            ),
+        )
         object.__setattr__(self, "scope_id", _require_text("scope_ref.scope_id", self.scope_id))
         if self.parent_scope_id is not None:
             object.__setattr__(self, "parent_scope_id", str(self.parent_scope_id))
@@ -527,7 +601,12 @@ class ControlAction:
         object.__setattr__(
             self,
             "action_type",
-            _require_text("CS.selected_action.action_type", self.action_type),
+            _normalize_choice(
+                "CS.selected_action.action_type",
+                self.action_type,
+                allowed=CANONICAL_ACTION_TYPES,
+                aliases=CANONICAL_ACTION_TYPE_ALIASES,
+            ),
         )
         if self.target_ref is not None and not isinstance(self.target_ref, StateRef):
             raise StateIRValidationError("CS.selected_action.target_ref must be a StateRef object.")
@@ -575,11 +654,44 @@ class BudgetState:
 
 
 @dataclass(frozen=True)
+class AdjudicationState:
+    task_adjudication_policy_id: str
+    adjudication_status: str
+    decisive_vs_refs: Tuple[StateRef, ...] = ()
+    blocking_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "task_adjudication_policy_id",
+            _require_text(
+                "CS.adjudication_state.task_adjudication_policy_id",
+                self.task_adjudication_policy_id,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "adjudication_status",
+            _normalize_choice(
+                "CS.adjudication_state.adjudication_status",
+                self.adjudication_status,
+                allowed=CANONICAL_ADJUDICATION_STATUSES,
+                aliases=CANONICAL_ADJUDICATION_STATUS_ALIASES,
+            ),
+        )
+        object.__setattr__(self, "decisive_vs_refs", tuple(self.decisive_vs_refs))
+        if self.blocking_reason is not None:
+            object.__setattr__(self, "blocking_reason", str(self.blocking_reason))
+
+
+@dataclass(frozen=True)
 class ControlState:
     selected_action: ControlAction
     budget_state: BudgetState
+    runtime_status: str
     uncertainty_state: str
     escalation_state: str
+    adjudication_state: AdjudicationState | None = None
     action_candidates: Tuple[ControlAction, ...] = ()
     recovery_target: str | None = None
     vector: np.ndarray | None = None
@@ -591,6 +703,16 @@ class ControlState:
             raise StateIRValidationError("CS.budget_state must be a BudgetState object.")
         object.__setattr__(
             self,
+            "runtime_status",
+            _normalize_choice(
+                "CS.runtime_status",
+                self.runtime_status,
+                allowed=CANONICAL_RUNTIME_STATUSES,
+                aliases=CANONICAL_RUNTIME_STATUS_ALIASES,
+            ),
+        )
+        object.__setattr__(
+            self,
             "uncertainty_state",
             _require_text("CS.uncertainty_state", self.uncertainty_state),
         )
@@ -599,11 +721,32 @@ class ControlState:
             "escalation_state",
             _require_text("CS.escalation_state", self.escalation_state),
         )
+        if self.adjudication_state is not None and not isinstance(self.adjudication_state, AdjudicationState):
+            raise StateIRValidationError("CS.adjudication_state must be an AdjudicationState object.")
         object.__setattr__(self, "action_candidates", tuple(self.action_candidates))
         if self.recovery_target is not None:
             object.__setattr__(self, "recovery_target", str(self.recovery_target))
         vector = self.vector if self.vector is not None else np.zeros((1,), dtype=np.float32)
         object.__setattr__(self, "vector", _normalize_vector("CS", "control", vector))
+        self._validate_status_pair()
+
+    def _validate_status_pair(self) -> None:
+        if self.adjudication_state is None:
+            return
+        runtime_status = str(self.runtime_status)
+        adjudication_status = str(self.adjudication_state.adjudication_status)
+        if runtime_status == "candidate_ready" and adjudication_status not in {"pending", "ready"}:
+            raise StateIRValidationError(
+                "CS.runtime_status=candidate_ready may pair only with adjudication_status pending or ready."
+            )
+        if runtime_status in {"accepted", "rejected", "abstained"} and runtime_status != adjudication_status:
+            raise StateIRValidationError(
+                "Terminal runtime_status must match adjudication_state.adjudication_status."
+            )
+        if runtime_status == "budget_exhausted" and adjudication_status != "blocked":
+            raise StateIRValidationError(
+                "CS.runtime_status=budget_exhausted must pair with adjudication_status=blocked."
+            )
 
 
 _SECTION_ENTRY_UNION: TypeAlias = Union[
@@ -813,6 +956,7 @@ class StateIR:
                     action_status="selected",
                 ),
                 budget_state=BudgetState(global_step_budget_remaining=0),
+                runtime_status="in_progress",
                 uncertainty_state="unknown",
                 escalation_state="inactive",
                 vector=zero,

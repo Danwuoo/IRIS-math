@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p>
+      <w:r><w:t>Bootstrap Theorem</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>For all x, x = x.</w:t></w:r>
+    </w:p>
+    <w:p>
+      <w:r><w:t>Proof: therefore x = x.</w:t></w:r>
+    </w:p>
+  </w:body>
+</w:document>

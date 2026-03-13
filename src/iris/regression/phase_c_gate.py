@@ -251,6 +251,44 @@ def build_concept_breakdown(conceptarc_corpus: Path, context: GateContext) -> Di
             "concepts": [],
         }
 
+    fixture_files = sorted(conceptarc_corpus.glob("*.json"))
+    for fixture_file in fixture_files:
+        try:
+            payload = json.loads(fixture_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, Mapping):
+            continue
+        schema = str(payload.get("schema", "")).strip()
+        if schema != "iris.math_native.concept_fixture/v1":
+            continue
+        items = payload.get("items", [])
+        if not isinstance(items, Sequence) or isinstance(items, (str, bytes, bytearray)):
+            items = []
+        isolation_scores = [_safe_float(item.get("isolation_score"), 0.0) for item in items if isinstance(item, Mapping)]
+        leakage_scores = [_safe_float(item.get("leakage_score"), 0.0) for item in items if isinstance(item, Mapping)]
+        test_case_count = max(len(isolation_scores), 1)
+        isolation_score = (
+            sum(isolation_scores) / float(len(isolation_scores))
+            if isolation_scores
+            else _safe_float(payload.get("concept.isolation_score"), 0.0)
+        )
+        leakage_score = (
+            sum(leakage_scores) / float(len(leakage_scores))
+            if leakage_scores
+            else _safe_float(payload.get("concept.leakage_score"), max(0.0, 1.0 - isolation_score))
+        )
+        concepts.append(
+            {
+                "concept_id": str(payload.get("concept_id", fixture_file.stem)),
+                "task_count": int(payload.get("task_count", 1)),
+                "test_case_count": test_case_count,
+                "proxy.exact_match_rate": float(payload.get("proxy.exact_match_rate", isolation_score)),
+                "concept.isolation_score": float(isolation_score),
+                "concept.leakage_score": float(leakage_score),
+            }
+        )
+
     for concept_dir in sorted(path for path in conceptarc_corpus.iterdir() if path.is_dir()):
         task_files = sorted(concept_dir.glob("*.json"))
         if not task_files:
@@ -354,6 +392,30 @@ def build_paired_representation_diff(
         try:
             payload = json.loads(task_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
+            continue
+        if isinstance(payload, Mapping) and str(payload.get("schema", "")).strip() == "iris.math_native.paired_fixture/v1":
+            fixture_pairs = payload.get("pairs", [])
+            if not isinstance(fixture_pairs, Sequence) or isinstance(fixture_pairs, (str, bytes, bytearray)):
+                fixture_pairs = []
+            for pair_index, pair_payload in enumerate(fixture_pairs):
+                if not isinstance(pair_payload, Mapping):
+                    continue
+                left_accuracy = _safe_float(pair_payload.get("left_score"), 0.0)
+                right_accuracy = _safe_float(pair_payload.get("right_score"), 0.0)
+                invariance_gap = abs(left_accuracy - right_accuracy)
+                asymmetry = bool(pair_payload.get("asymmetry", (left_accuracy >= 0.5) != (right_accuracy >= 0.5)))
+                pairs.append(
+                    {
+                        "task_id": str(payload.get("task_id", task_file.stem)),
+                        "pair_index": pair_index,
+                        "left.cell_accuracy": float(left_accuracy),
+                        "right.cell_accuracy": float(right_accuracy),
+                        "pair.invariance_gap": float(
+                            pair_payload.get("expected_invariance_gap", invariance_gap)
+                        ),
+                        "pair.asymmetry": bool(asymmetry),
+                    }
+                )
             continue
         cases: List[Any] = []
         if isinstance(payload, list):

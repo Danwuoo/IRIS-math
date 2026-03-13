@@ -22,7 +22,12 @@ def main() -> int:
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--phase", type=str, default="C")
     parser.add_argument("--backend", type=str, default="jax", choices=["jax"])
-    parser.add_argument("--level-impl", type=str, default="mounted", choices=["mounted", "stub", "mixed"])
+    parser.add_argument(
+        "--level-impl",
+        type=str,
+        default="jax_transition",
+        choices=["mounted", "stub", "mixed", "jax_transition"],
+    )
     parser.add_argument("--strict-jax", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--level-alpha", type=float, default=0.1)
     parser.add_argument(

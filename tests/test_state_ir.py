@@ -4,6 +4,9 @@ import numpy as np
 import pytest
 
 from iris.schema import (
+    CANONICAL_ADJUDICATION_STATUSES,
+    CANONICAL_RUNTIME_STATUSES,
+    AdjudicationState,
     BudgetState,
     ControlAction,
     ControlState,
@@ -39,8 +42,13 @@ def _minimal_state(hidden_dim: int = 4) -> StateIR:
                 action_type="continue",
             ),
             budget_state=BudgetState(global_step_budget_remaining=0),
+            runtime_status="in_progress",
             uncertainty_state="unknown",
             escalation_state="inactive",
+            adjudication_state=AdjudicationState(
+                task_adjudication_policy_id="task-family-answer-only-default-v1",
+                adjudication_status="pending",
+            ),
             vector=zero,
         ),
     )
@@ -92,3 +100,27 @@ def test_empty_optional_sections_are_allowed() -> None:
         "CS": 1,
     }
     assert STATE_IR_TOKEN_ORDER == ("PF", "SY", "CG", "FR", "LM", "VS", "CS")
+
+
+def test_control_state_normalizes_scope_and_status_vocabularies() -> None:
+    state = _minimal_state()
+    assert state.CS.runtime_status in CANONICAL_RUNTIME_STATUSES
+    assert state.CS.adjudication_state is not None
+    assert state.CS.adjudication_state.adjudication_status in CANONICAL_ADJUDICATION_STATUSES
+
+
+def test_budget_exhausted_requires_blocked_adjudication() -> None:
+    zero = np.zeros((4,), dtype=np.float32)
+    with pytest.raises(StateIRValidationError):
+        ControlState(
+            selected_action=ControlAction(action_id="action-stop", action_type="stop"),
+            budget_state=BudgetState(global_step_budget_remaining=0),
+            runtime_status="budget_exhausted",
+            uncertainty_state="high",
+            escalation_state="inactive",
+            adjudication_state=AdjudicationState(
+                task_adjudication_policy_id="task-family-answer-only-default-v1",
+                adjudication_status="ready",
+            ),
+            vector=zero,
+        )

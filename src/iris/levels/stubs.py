@@ -102,8 +102,8 @@ def build_level_stack(
     seed: int = 0,
 ) -> Dict[str, LevelInterface]:
     enabled_levels = enabled_levels or {}
-    if implementation not in {"stub", "mounted", "mixed"}:
-        raise ValueError("implementation must be one of: stub, mounted, mixed.")
+    if implementation not in {"stub", "mounted", "mixed", "jax_transition"}:
+        raise ValueError("implementation must be one of: stub, mounted, mixed, jax_transition.")
 
     if implementation == "stub":
         return {
@@ -116,7 +116,20 @@ def build_level_stack(
             "L6": L6Level(enabled=enabled_levels.get("L6", False)),
         }
 
-    from .mounted import (
+    mounted_module_name = "iris.levels.jax_transition" if implementation == "jax_transition" else "iris.levels.mounted"
+    module = __import__(
+        mounted_module_name,
+        fromlist=[
+            "L0MountedLevel",
+            "L1MountedLevel",
+            "L2MountedLevel",
+            "L3MountedLevel",
+            "L4MountedLevel",
+            "L5MountedLevel",
+            "L6MountedLevel",
+        ],
+    )
+    (
         L0MountedLevel,
         L1MountedLevel,
         L2MountedLevel,
@@ -124,6 +137,14 @@ def build_level_stack(
         L4MountedLevel,
         L5MountedLevel,
         L6MountedLevel,
+    ) = (
+        module.L0MountedLevel,
+        module.L1MountedLevel,
+        module.L2MountedLevel,
+        module.L3MountedLevel,
+        module.L4MountedLevel,
+        module.L5MountedLevel,
+        module.L6MountedLevel,
     )
 
     mounted = {
@@ -135,7 +156,7 @@ def build_level_stack(
         "L5": L5MountedLevel(hidden_dim=hidden_dim, seed=seed + 6),
         "L6": L6MountedLevel(hidden_dim=hidden_dim, seed=seed + 7),
     }
-    if implementation == "mounted":
+    if implementation in {"mounted", "jax_transition"}:
         return mounted
 
     mixed: Dict[str, LevelInterface] = {}

@@ -118,6 +118,14 @@ def evaluate_latest_run(
             "decontam_policy_id": checkpoint.get(
                 "decontam_policy_id", last_metrics.get("decontam_policy_id", "")
             ),
+            "learning_objective_bundle_id": checkpoint.get(
+                "learning_objective_bundle_id",
+                last_metrics.get("learning_objective_bundle_id", ""),
+            ),
+            "learning_objective_bundle_resolution_source": checkpoint.get(
+                "learning_objective_bundle_resolution_source",
+                last_metrics.get("learning_objective_bundle_resolution_source", ""),
+            ),
             "benchmark_family_policy_refs": checkpoint.get(
                 "benchmark_family_policy_refs",
                 last_metrics.get("benchmark_family_policy_refs", []),
@@ -137,6 +145,24 @@ def evaluate_latest_run(
             ),
             "verifier_provenance_id": checkpoint.get(
                 "verifier_provenance_id", last_metrics.get("verifier_provenance_id", "")
+            ),
+            "task_family": checkpoint.get("task_family", last_metrics.get("task_family", "")),
+            "task_family_resolution_source": checkpoint.get(
+                "task_family_resolution_source",
+                last_metrics.get("task_family_resolution_source", ""),
+            ),
+            "task_adjudication_policy_id": checkpoint.get(
+                "task_adjudication_policy_id",
+                last_metrics.get("task_adjudication_policy_id", ""),
+            ),
+            "task_adjudication_policy_resolution_source": checkpoint.get(
+                "task_adjudication_policy_resolution_source",
+                last_metrics.get("task_adjudication_policy_resolution_source", ""),
+            ),
+            "runtime_status": checkpoint.get("runtime_status", last_metrics.get("runtime_status", "")),
+            "adjudication_status": checkpoint.get(
+                "adjudication_status",
+                last_metrics.get("adjudication_status", ""),
             ),
             "data_source": last_metrics.get("data_source", data_provenance.get("data_source", "synthetic")),
             "data.profile_id": data_provenance.get("profile_id", last_metrics.get("data.profile_id", "")),

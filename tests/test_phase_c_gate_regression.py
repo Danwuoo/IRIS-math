@@ -102,6 +102,17 @@ def test_build_paired_representation_diff_from_minimal_rearc(tmp_path: Path) -> 
     assert report["paired.invariance.gap"] >= 0.0
 
 
+def test_build_math_native_regression_fixtures() -> None:
+    fixture_root = Path(__file__).resolve().parent / "fixtures" / "p1_phase_c" / "regression"
+    concept_report = build_concept_breakdown(fixture_root / "concepts", GateContext())
+    paired_report = build_paired_representation_diff(fixture_root / "pairs", GateContext(), max_tasks=8)
+
+    assert concept_report["status"] == "PASS"
+    assert concept_report["concept_count"] == 2
+    assert paired_report["status"] == "PASS"
+    assert paired_report["pair_count"] == 2
+
+
 def test_resume_consistency_packet_passes_when_four_paths_exist(tmp_path: Path) -> None:
     context = GateContext()
     run_ids = ["uninterrupted", "execute_crash", "pre_commit_crash", "post_commit_crash"]

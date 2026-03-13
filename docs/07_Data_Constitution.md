@@ -744,6 +744,55 @@ Rules:
 3. Weak-supervision cap is aggregate across Pool B and any other records explicitly labeled `weak_supervision_only`.
 4. `P4` remains readiness-reviewed and is not precommitted here.
 
+### 7.2.1 Bootstrap Hugging Face Candidate Registry
+
+This subsection records a bootstrap Hugging Face starter set for `P1-P3`.
+It is not a blanket allowlist and it does not override the pool, benchmark-tier, provenance, or decontamination rules in this document.
+Every committed run still needs:
+
+- a resolved `data_realization_policy/v1`,
+- a resolved `decontam_policy/v1`,
+- resolvable provenance refs,
+- benchmark-family refs where benchmark-derived material is present,
+- canonical record / fingerprint coverage before train-visible admission.
+
+Transition note:
+
+- any legacy dataset profile under `src/` is a transition artifact for input plumbing, not an authority surface for v2 data admission or benchmark policy.
+
+The registry below distinguishes:
+
+- `streaming_ready`: train-visible or auxiliary text/semi-formal records that can be read with dataset streaming once revision lock and provenance fields are fixed,
+- `capture_only`: Hugging Face-hosted material that is useful as a source snapshot but is not directly train-visible until canonicalization and fingerprinting complete,
+- `eval_only`: benchmark or benchmark-like material that should stay outside ordinary training manifests unless separately registered and policy-cleared.
+
+| Hugging Face dataset | Default pool / role | Bootstrap posture | Why it belongs | Required restrictions |
+| --- | --- | --- | --- | --- |
+| `open-web-math/open-web-math` | Pool A `core` | `streaming_ready` | High-quality mathematical web text with strong symbol and formula density | Deduplicate against `EleutherAI/proof-pile-2/open-web-math` and other CommonCrawl-derived math corpora before train-visible use |
+| `HuggingFaceTB/finemath` (`finemath-4plus` preferred for `P1`) | Pool A `core` | `streaming_ready` | High-quality educational math text with Markdown / LaTeX structure | Record the exact config name in the source manifest; deduplicate against overlapping CommonCrawl and OpenWebMath lineage |
+| `crumb/openstax-text` (mathematics / precalculus / calculus / statistics titles only) | Pool A `core` | `streaming_ready` | Open textbooks for definition precision, theorem style, and worked exposition | Filter to math-relevant textbooks only; retain textbook identity and section/page lineage where recoverable |
+| `AI-MO/NuminaMath-1.5` | Pool B `weak_supervision_only` | `streaming_ready` | Large math problem / solution corpus with useful problem metadata and source tags | Must not be treated as proof-valid gold; benchmark-adjacent or olympiad-derived records require family/tier audit and contamination firewalling |
+| `open-r1/OpenR1-Math-220k` | Pool B `weak_supervision_only` | `streaming_ready` | Multiple reasoning traces per problem with answer verification for most samples | Derived from `AI-MO/NuminaMath-1.5`; do not count as independent evidence without lineage-aware deduplication; traces remain weak supervision only |
+| `AI-MO/NuminaMath-LEAN` | Pool C `core` | `streaming_ready` | Large Lean 4 formalization set with `formal_statement`, `formal_ground_truth`, and provenance-bearing source fields | Keep `author`, `ground_truth_type`, and source lineage in-band; benchmark-family overlap must remain explicit and audited |
+| `pkuAI4M/LeanWorkbook` | Pool C `core` | `streaming_ready` | Natural-language to Lean 4 aligned theorem statements for bridge training | Treat theorem statements and any downstream proof completion as distinct surfaces; checker-backed acceptance remains required at eval time |
+| `proofcheck/prooflang` | Pool D `auxiliary` | `streaming_ready` after canonicalization | Large arXiv proof corpus keyed by paper id and subject tags | Preserve arXiv ids / tags as provenance; not proof-valid gold by default; canonical anchors are required before document-grounded training claims |
+| `EleutherAI/proof-pile-2` (subset must be explicit) | Pool A or C `auxiliary` | `streaming_ready` | Convenient bundled access to `arxiv`, `open-web-math`, and `algebraic-stack` subsets | Do not admit the whole corpus as one opaque source; record subset id explicitly and deduplicate against direct constituent datasets |
+| `allenai/peS2o` (`s2orc` only, math-filtered) | Pool D `auxiliary` | `streaming_ready` after explicit filter declaration | Large scientific-paper corpus useful for long-form theorem and exposition text | `peS2o` is not math-only on its face; direct math filter semantics on the dataset card are 不確定, so subject filtering and source-lineage policy must be declared before admission |
+| `Monketoo/math-docs-dataset` | Pool D `core` after canonicalization | `capture_only` | Math-heavy PDF corpus with metadata, extracted text, and downloadable full PDFs | Raw PDFs or extracted text are not directly train-visible; they must pass `capture -> extract -> canonicalize -> fingerprint -> quality_gate` first |
+
+HF-hosted benchmark and calibration surfaces should stay outside routine training manifests by default:
+
+| Hugging Face dataset | Family / role | Bootstrap posture | Rule |
+| --- | --- | --- | --- |
+| `AI-MO/aimo-validation-aime` | AIMO-like validation surface | `eval_only` | Use for held-out evaluation or contamination checks only; not for routine train-visible mixing |
+| `AI-MO/minif2f_test` | miniF2F held-out surface | `eval_only` | Keep as formal held-out evaluation only |
+| `hoskinson-center/proofnet` | formalization / proof benchmark | `eval_only` | Use for bridge evaluation or calibration; not as default train core |
+| `PAug/ProofNetSharp` | Lean 4 ProofNet port | `eval_only` | Use for bridge evaluation or calibration; not as default train core |
+
+Current HF status note:
+
+- an official Hugging Face source for `Omni-MATH` is 不確定 at the time of writing, so this constitution does not name one as an authoritative default.
+
 ### 7.3 Bootstrap Source-Family and Role Defaults
 
 Bootstrap `source_family_allowlists` for `P1-P3` must start from the following defaults.

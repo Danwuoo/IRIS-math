@@ -11,6 +11,7 @@ from iris.train.data import (
     load_default_policy_bundle,
     load_policy_bundle,
     load_policy_bundle_for_profile,
+    load_policy_bundle_for_profile_phase,
     validate_math_document_projection,
     validate_math_document_record,
     validate_math_document_source,
@@ -45,6 +46,15 @@ def test_profile_bundle_registry_loads_p2_and_p3() -> None:
     assert p3.data_realization_policy.phase == "D"
     assert p3.data_realization_policy.pool_allocations["C"].record_weight == 30.0
     assert p3.data_realization_policy.source_family_allowlists["D"]["core"] == ("PDF", "DOCX", "image")
+
+
+def test_p1_phase_specific_bundle_allows_zero_tier1_cap_in_phase_a() -> None:
+    phase_a = load_policy_bundle_for_profile_phase("P1", "A")
+    phase_c = load_policy_bundle_for_profile_phase("P1", "C")
+
+    assert phase_a.data_realization_policy.data_realization_policy_id == "p1-bootstrap-a-v1"
+    assert phase_a.data_realization_policy.tier1_global_cap == {"token_cap": 0.0, "record_cap": 0.0}
+    assert phase_c.data_realization_policy.data_realization_policy_id == "p1-bootstrap-c-v1"
 
 
 def test_document_slice_id_is_stable_and_tracks_provenance_changes() -> None:

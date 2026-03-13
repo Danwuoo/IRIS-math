@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Tuple
 
@@ -124,6 +124,9 @@ class BenchmarkFamilyPolicy:
     cluster_exclusion_key: str
     tier3_strict_holdout_source_id: str
     decontam_policy_id: str
+    default_task_family_map: Dict[str, str]
+    task_adjudication_policy_refs: Tuple[str, ...]
+    benchmark_family_adjudication_overrides: Dict[str, str]
     tuning_visible_surfaces: Tuple[str, ...]
     tuning_observe_only_surfaces: Tuple[str, ...]
     tuning_blocked_surfaces: Tuple[str, ...]
@@ -164,6 +167,32 @@ class DataPolicyBundle:
                 "provenance_manifest_ids": sorted(self.provenance_manifests.keys()),
             }
         )
+
+
+@dataclass(frozen=True)
+class TrainVisibleRecord:
+    record_id: str
+    pool_id: str
+    pool_role: str
+    data_realization_policy_id: str
+    decontam_policy_id: str
+    fingerprint_set: Mapping[str, Any]
+    source_family: str
+    provenance_refs: Mapping[str, Any]
+    quality_flags: Tuple[str, ...]
+    source_record_lineage: Mapping[str, Any]
+    benchmark_family_id: str
+    benchmark_tier: str
+    math_document_record_id: str
+    formalizer_provenance_id: str
+
+
+@dataclass(frozen=True)
+class P1RecordAdmission:
+    admission_status: str
+    packing_profile: str
+    reason: str
+    train_visible: bool
 
 
 def _parse_pool_allocations(raw_allocations: Mapping[str, Any]) -> Dict[str, PoolAllocation]:
@@ -240,7 +269,15 @@ def _parse_data_realization_policy(raw_policy: Mapping[str, Any]) -> DataRealiza
         ("tier1_global_cap", policy.tier1_global_cap),
         ("weak_supervision_cap", policy.weak_supervision_cap),
     ):
-        if float(caps["token_cap"]) <= 0.0 or float(caps["record_cap"]) <= 0.0:
+        token_cap = float(caps["token_cap"])
+        record_cap = float(caps["record_cap"])
+        if cap_name == "tier1_global_cap" and policy.profile_id == "P1" and policy.phase == "A":
+            if token_cap != 0.0 or record_cap != 0.0:
+                raise PolicyValidationError(
+                    "P1 Phase A tier1_global_cap must be exactly 0/0."
+                )
+            continue
+        if token_cap <= 0.0 or record_cap <= 0.0:
             raise PolicyValidationError(f"{cap_name} must declare positive token_cap and record_cap.")
     missing_record_fields = sorted(
         set(REQUIRED_TRAIN_VISIBLE_RECORD_FIELDS) - set(policy.train_visible_record_required_fields)
@@ -325,6 +362,17 @@ def _parse_benchmark_family_policy(raw_policy: Mapping[str, Any]) -> BenchmarkFa
         cluster_exclusion_key=str(raw_policy.get("cluster_exclusion_key", "")).strip(),
         tier3_strict_holdout_source_id=str(raw_policy.get("tier3_strict_holdout_source_id", "")).strip(),
         decontam_policy_id=str(raw_policy.get("decontam_policy_id", "")).strip(),
+        default_task_family_map={
+            str(key): str(value).strip()
+            for key, value in dict(raw_policy.get("default_task_family_map", {})).items()
+            if str(value).strip()
+        },
+        task_adjudication_policy_refs=_as_tuple_of_str(raw_policy.get("task_adjudication_policy_refs", [])),
+        benchmark_family_adjudication_overrides={
+            str(key): str(value).strip()
+            for key, value in dict(raw_policy.get("benchmark_family_adjudication_overrides", {})).items()
+            if str(value).strip()
+        },
         tuning_visible_surfaces=_as_tuple_of_str(raw_policy.get("tuning_visible_surfaces", [])),
         tuning_observe_only_surfaces=_as_tuple_of_str(
             raw_policy.get("tuning_observe_only_surfaces", [])
@@ -495,6 +543,34 @@ def load_default_policy_bundle() -> DataPolicyBundle:
     return load_policy_bundle(bundle_path)
 
 
+def _derive_p1_phase_bundle(base_bundle: DataPolicyBundle, phase: str) -> DataPolicyBundle:
+    normalized_phase = str(phase).strip().upper()
+    if normalized_phase not in {"A", "B", "C"}:
+        raise PolicyValidationError(f"P1 phase bundle is not registered for phase={phase!r}.")
+    if normalized_phase == "B":
+        return base_bundle
+    id_by_phase = {
+        "A": "p1-bootstrap-a-v1",
+        "B": "p1-bootstrap-b-v2",
+        "C": "p1-bootstrap-c-v1",
+    }
+    tier1_cap = {"token_cap": 0.0, "record_cap": 0.0} if normalized_phase == "A" else dict(
+        base_bundle.data_realization_policy.tier1_global_cap
+    )
+    data_policy = replace(
+        base_bundle.data_realization_policy,
+        data_realization_policy_id=id_by_phase[normalized_phase],
+        phase=normalized_phase,
+        tier1_global_cap=tier1_cap,
+    )
+    return validate_policy_bundle(
+        replace(
+            base_bundle,
+            data_realization_policy=data_policy,
+        )
+    )
+
+
 def load_policy_bundle_for_profile(profile_id: str) -> DataPolicyBundle:
     normalized = str(profile_id).strip().upper()
     bundle_names = {
@@ -506,6 +582,94 @@ def load_policy_bundle_for_profile(profile_id: str) -> DataPolicyBundle:
         raise PolicyValidationError(f"No bootstrap policy bundle registered for profile_id={profile_id!r}.")
     bundle_path = Path(__file__).resolve().parent / "profiles" / bundle_names[normalized]
     return load_policy_bundle(bundle_path)
+
+
+def load_policy_bundle_for_profile_phase(profile_id: str, phase: str) -> DataPolicyBundle:
+    normalized_profile = str(profile_id).strip().upper()
+    normalized_phase = str(phase).strip().upper()
+    bundle = load_policy_bundle_for_profile(normalized_profile)
+    if normalized_profile == "P1":
+        return _derive_p1_phase_bundle(bundle, normalized_phase)
+    if normalized_phase and normalized_phase != str(bundle.data_realization_policy.phase).upper():
+        bundle = replace(
+            bundle,
+            data_realization_policy=replace(bundle.data_realization_policy, phase=normalized_phase),
+        )
+        return validate_policy_bundle(bundle)
+    return bundle
+
+
+def validate_train_visible_record(
+    payload: Mapping[str, Any],
+    policy: DataRealizationPolicy,
+) -> TrainVisibleRecord:
+    missing_fields = [
+        field_name
+        for field_name in policy.train_visible_record_required_fields
+        if field_name not in payload
+    ]
+    if missing_fields:
+        raise PolicyValidationError(
+            f"Train-visible record is missing required fields: {missing_fields}."
+        )
+    pool_id = str(payload.get("pool_id", "")).strip()
+    pool_role = str(payload.get("pool_role", "")).strip()
+    if pool_id not in set(POOL_IDS):
+        raise PolicyValidationError(f"Unknown pool_id={pool_id!r}.")
+    allocation = policy.pool_allocations.get(pool_id)
+    if allocation is None:
+        raise PolicyValidationError(f"Pool {pool_id!r} is not configured in the active policy.")
+    if pool_role not in set(allocation.allowed_roles):
+        raise PolicyValidationError(
+            f"pool_role={pool_role!r} is not allowed for pool_id={pool_id!r}."
+        )
+    benchmark_tier = str(payload.get("benchmark_tier", "")).strip()
+    if benchmark_tier and benchmark_tier not in set(TIER_IDS):
+        raise PolicyValidationError(f"Unknown benchmark_tier={benchmark_tier!r}.")
+    return TrainVisibleRecord(
+        record_id=str(payload["record_id"]),
+        pool_id=pool_id,
+        pool_role=pool_role,
+        data_realization_policy_id=str(payload["data_realization_policy_id"]),
+        decontam_policy_id=str(payload["decontam_policy_id"]),
+        fingerprint_set=dict(payload["fingerprint_set"]),
+        source_family=str(payload["source_family"]),
+        provenance_refs=dict(payload["provenance_refs"]),
+        quality_flags=_as_tuple_of_str(payload.get("quality_flags", [])),
+        source_record_lineage=dict(payload["source_record_lineage"]),
+        benchmark_family_id=str(payload["benchmark_family_id"]),
+        benchmark_tier=benchmark_tier,
+        math_document_record_id=str(payload["math_document_record_id"]),
+        formalizer_provenance_id=str(payload["formalizer_provenance_id"]),
+    )
+
+
+def admit_p1_train_visible_record(
+    record: TrainVisibleRecord,
+    policy_bundle: DataPolicyBundle,
+) -> P1RecordAdmission:
+    policy = policy_bundle.data_realization_policy
+    if record.data_realization_policy_id != policy.data_realization_policy_id:
+        raise PolicyValidationError(
+            "Train-visible record data_realization_policy_id does not match the active policy."
+        )
+    if record.decontam_policy_id != policy.decontam_policy_id:
+        raise PolicyValidationError(
+            "Train-visible record decontam_policy_id does not match the active policy."
+        )
+    if policy.profile_id == "P1" and policy.phase == "A" and record.benchmark_tier == "Tier 1":
+        return P1RecordAdmission(
+            admission_status="admitted",
+            packing_profile="p1_phase_a_train_visible_v1",
+            reason="Tier 1 cap is 0/0 in Phase A; benchmark record remains non-train-visible.",
+            train_visible=False,
+        )
+    return P1RecordAdmission(
+        admission_status="admitted",
+        packing_profile=f"p1_phase_{policy.phase.lower()}_train_visible_v1",
+        reason="Record satisfies phase-specific train-visible admission requirements.",
+        train_visible=True,
+    )
 
 
 def build_document_slice_id(

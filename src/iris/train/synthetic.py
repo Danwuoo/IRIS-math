@@ -5,6 +5,7 @@ import hashlib
 import numpy as np
 
 from ..schema import (
+    AdjudicationState,
     ApplicabilityAudit,
     Branch,
     BudgetState,
@@ -171,8 +172,13 @@ def generate_synthetic_state(
                 branch_expansion_budget_remaining=int(rng.integers(0, 4)),
                 verifier_probe_budget_remaining=int(rng.integers(0, 3)),
             ),
+            runtime_status="in_progress",
             uncertainty_state="synthetic_estimate",
             escalation_state="inactive",
+            adjudication_state=AdjudicationState(
+                task_adjudication_policy_id="task-family-proof-semi-formal-default-v1",
+                adjudication_status="pending",
+            ),
             vector=cs_vector,
         ),
     )

@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from iris.schema import (
+    AdjudicationState,
     AnchorRef,
     ApplicabilityAudit,
     Branch,
@@ -44,7 +45,7 @@ def make_state_ir(
         support_kind="text_span",
         confidence=0.99,
     )
-    scope = ScopeRef(scope_kind="global", scope_id="scope-0")
+    scope = ScopeRef(scope_kind="problem_global", scope_id="scope-0")
     pf = ProblemFrame(
         task_type="proof",
         target_spec="prove x = x",
@@ -204,8 +205,13 @@ def make_state_ir(
             verifier_probe_budget_remaining=1,
             reparse_budget_remaining=1,
         ),
+        runtime_status="in_progress",
         uncertainty_state="bounded",
         escalation_state="inactive",
+        adjudication_state=AdjudicationState(
+            task_adjudication_policy_id="task-family-proof-natural-language-default-v1",
+            adjudication_status="pending",
+        ),
         action_candidates=(
             continue_action,
             ControlAction(
