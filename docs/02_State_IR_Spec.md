@@ -2,8 +2,8 @@
 
 **Document Type:** Canonical Specification (Normative)<br>
 **Effective date:** 2026-03-11<br>
-**Version:** 2.1<br>
-**Revision note:** Clarifies entry-level schema, mutation units, and required/deferred field classes without changing the seven-slot inventory.<br>
+**Version:** 2.2<br>
+**Revision note:** Clarifies `L5` landing semantics, control-state runtime/adjudication fields, and binding to task adjudication without changing the seven-slot inventory.<br>
 **Authority:** This document defines the active IRIS-math v2 State IR.
 
 ---
@@ -61,7 +61,7 @@ State IR v2 uses seven fixed-order slot groups.
 | Proof / Program Frontier | `FR` | `0..N_fr` | one `frontier_entry` | Hypotheses, subgoals, candidate strategies, branches, obligations |
 | Memory / Lemma Interface | `LM` | `0..N_lm` | one `lemma_binding` | Retrieved lemmas, match conditions, applicability audit, mismatch notes |
 | Verifier State | `VS` | `0..N_vs` | one `verifier_entry` | Local validity, gap evidence, counterexample evidence, consistency summaries |
-| Control State | `CS` | exactly 1 | singleton control record plus identified `control_action` entries | Continue/backtrack/reparse/switch/stop intent, budget, escalation |
+| Control State | `CS` | exactly 1 | singleton control record plus identified `control_action` entries | Continue/backtrack/reparse/switch/stop intent, budget, escalation, runtime status, adjudication |
 
 No additional top-level slot groups are permitted.
 
@@ -161,7 +161,7 @@ PF = {
 | `required_output.answer_channel` | `required_at_creation` | Natural-language proof, formula, program, formal statement, structured object, or mixed output |
 | `required_output.formality_level` | `deferred_allowed` | Informal, semi-formal, formal, or profile-specific equivalent |
 | `required_output.format_constraints` | `deferred_allowed` | Output shape restrictions such as exact value, bounded explanation, theorem-proof format, or theorem-formalization target |
-| `required_output.verifier_mode` | `deferred_allowed` | Verifier surface expected to judge success |
+| `required_output.verifier_mode` | `deferred_allowed` | Verifier surface expected to judge success; it must resolve before terminal adjudication under `docs/19_Runtime_and_Task_Adjudication_Semantics.md` |
 | `problem_assumptions[]` | `deferred_allowed` | May start empty, but the field itself must exist |
 | `domain_tags[]` | `deferred_allowed` | Algebra, geometry, number theory, analysis, combinatorics, or finer domain tags |
 | `source_anchor_refs[]` | `required_at_creation` | Must exist as a field; for document-grounded tasks the list may not be empty |
@@ -353,7 +353,7 @@ applicability_audit = {
 | Field | Obligation | Notes |
 | --- | --- | --- |
 | `lm_id` | `required_at_creation` | Stable memory-binding id |
-| `memory_kind` | `required_at_creation` | `lemma`, `definition`, `example`, `pattern`, `prior_branch`, or equivalent |
+| `memory_kind` | `required_at_creation` | `lemma`, `definition`, `example`, `pattern`, `prior_branch`, `derived_abstraction`, or equivalent |
 | `source_ref` | `required_at_creation` | Memory source identity or external record reference |
 | `claim_signature` | `required_at_creation` | Normalized statement, theorem key, pattern signature, or equivalent content descriptor |
 | `binding_map` | `required_at_creation` | Mapping from retrieved symbols or slots into current `SY` / `FR` context; may be empty but must exist |
@@ -370,6 +370,26 @@ Rules:
 1. A retrieved item may not be treated as safely usable unless `applicability_audit.audit_status` is at least `provisional`.
 2. `binding_map` is mandatory because applicability without variable alignment is underspecified.
 3. When a retrieval is blocked or rejected, `mismatch_reasons[]` must become explicit.
+
+### 6.5A Canonical Landing Rules for `L5` Abstraction Outputs
+
+`L5` may not emit behavior-affecting abstractions into hidden side channels.
+Its outputs must land canonically in existing State IR slots according to semantic role:
+
+1. **Reusable abstraction, macro, or lemma-like summary**  
+   Lands in `LM` as a `lemma_binding` with `memory_kind = derived_abstraction`, `pattern`, `lemma`, or equivalent, plus `source_ref` back to the originating branch, proof fragment, or prior state.
+
+2. **Branch-scoped active invariant or compressed local assumption**  
+   Lands in `FR` as a `hypothesis` or `strategy_candidate` when the abstraction is only valid within the current proof/program branch.
+
+3. **Claim-bearing invariant relation**  
+   Lands in `CG` as one or more `constraint_relation` objects when the abstraction materially changes the accepted mathematical relation set.
+
+Rules:
+
+1. If an abstraction is simultaneously reusable and currently active in a branch, the reusable and branch-scoped effects must be represented separately rather than overloaded into one hidden object.
+2. L5-originated abstractions that constrain control, retrieval, verification, or final output must be visible in `LM`, `FR`, or `CG`; diagnostic-only compression metadata is insufficient.
+3. Applicability and scope remain explicit even for internally generated abstractions; local convenience summaries may not masquerade as globally valid lemmas.
 
 ### 6.6 Verifier State (`VS`)
 
@@ -427,7 +447,7 @@ Rules:
 ### 6.7 Control State (`CS`)
 
 `CS` is a singleton control record.
-Its canonical contract is symbolic action state with optional learned scores.
+Its canonical contract is symbolic action state with optional learned scores plus explicit runtime/adjudication status.
 Raw logits alone are not a compliant State IR representation.
 
 ```text
@@ -435,8 +455,10 @@ CS = {
   selected_action,
   action_candidates?,
   budget_state,
+  runtime_status,
   uncertainty_state,
   escalation_state,
+  adjudication_state?,
   recovery_target?
 }
 
@@ -456,6 +478,13 @@ budget_state = {
   verifier_probe_budget_remaining?,
   reparse_budget_remaining?
 }
+
+adjudication_state = {
+  task_adjudication_policy_id,
+  adjudication_status,
+  decisive_vs_refs?,
+  blocking_reason?
+}
 ```
 
 | Field | Obligation | Notes |
@@ -472,8 +501,13 @@ budget_state = {
 | `budget_state.branch_expansion_budget_remaining` | `deferred_allowed` | Optional finer-grained search budget |
 | `budget_state.verifier_probe_budget_remaining` | `deferred_allowed` | Optional finer-grained verifier budget |
 | `budget_state.reparse_budget_remaining` | `deferred_allowed` | Optional finer-grained reparse budget |
+| `runtime_status` | `required_at_creation` | Must use one of `in_progress`, `candidate_ready`, `accepted`, `rejected`, `abstained`, `budget_exhausted` as governed by `docs/19_Runtime_and_Task_Adjudication_Semantics.md` |
 | `uncertainty_state` | `required_at_creation` | Controller-visible uncertainty or indecision state |
 | `escalation_state` | `required_at_creation` | Whether stronger verification, wider search, or abstention escalation is active |
+| `adjudication_state.task_adjudication_policy_id` | `deferred_allowed` | Required once terminal task adjudication is attempted |
+| `adjudication_state.adjudication_status` | `deferred_allowed` | Must use one of `pending`, `ready`, `accepted`, `rejected`, `abstained`, `blocked` under the active task adjudication policy |
+| `adjudication_state.decisive_vs_refs[]` | `optional_diagnostic` | Verifier evidence objects that materially determined the adjudication |
+| `adjudication_state.blocking_reason` | `deferred_allowed` | Required when adjudication fails or remains blocked despite a candidate output |
 | `recovery_target` | `deferred_allowed` | Current intended repair locus or failure-target summary |
 
 Rules:
@@ -481,6 +515,7 @@ Rules:
 1. `stop`, `switch_strategy`, and `reparse` are symbolic control actions, not out-of-band booleans.
 2. Learned scores may accompany actions, but a score vector without a symbolic action identity is non-compliant.
 3. Finer-grained budgets may be deferred, but `global_step_budget_remaining` may not.
+4. `selected_action.action_type = stop` does not by itself imply accepted termination; terminal success or failure must be represented through `runtime_status` and, when available, `adjudication_state`.
 
 ---
 
@@ -522,7 +557,8 @@ Typical level pressure is:
 - `L0/L1`: primarily create or patch `PF`, `SY`, and `CG`,
 - `L2/L3`: primarily expand `FR` and select `CS`,
 - `L4`: primarily add or reject `LM` bindings,
-- `L6`: primarily emit `VS` objects and influence `CS` through verifier evidence.
+- `L5`: primarily emit reusable abstractions into `LM`, branch-scoped invariant summaries into `FR`, and claim-bearing invariant relations into `CG`,
+- `L6`: primarily emit `VS` objects and influence `CS` through verifier evidence and adjudication-ready summaries.
 
 Program traces or symbolic artifacts may exist outside State IR as auxiliary objects, but any behavior-affecting summary must be represented back into `FR`, `LM`, `VS`, or `CS`.
 

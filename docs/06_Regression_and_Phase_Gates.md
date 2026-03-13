@@ -3,7 +3,7 @@
 **Document Type:** Canonical Binding Workflow  
 **Metric Vocabulary Source:** `docs/05_Eval_Metrics_Spec.md`  
 **Scope:** Regression suites `S1-S8`, phase activation `A-E`, gate semantics, tolerance policy, required artifacts, and promotion criteria for IRIS-math v2  
-**Companion authority:** `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`
+**Companion authority:** `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`, `docs/18_Optimization_and_Learning_Contract.md`, `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
 
 ---
 
@@ -18,6 +18,8 @@ Legacy ARC-family probes may still appear as compatibility signals, but they are
 Benchmark-family governance details live in `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
 Verifier evidence policy lives in `docs/16_Verifier_and_Formalization_Stack.md`.
 Capability-readiness promotion between `P1-P4` lives in `docs/17_Scaling_Promotion_and_Readiness.md`.
+Learning-objective bundle semantics live in `docs/18_Optimization_and_Learning_Contract.md`.
+Task-family and terminal adjudication semantics live in `docs/19_Runtime_and_Task_Adjudication_Semantics.md`.
 
 ---
 
@@ -68,6 +70,7 @@ Data-constitution and benchmark-tier plumbing:
 - Tier 1 disclosure,
 - homologous split setup,
 - paired reformulation plumbing,
+- declared default `learning_objective_bundle/v1`,
 - no uncontrolled benchmark mixing.
 
 ### Phase C
@@ -76,6 +79,8 @@ Minimal closed loop:
 
 - all level interfaces `L0-L6` present,
 - credit routing live,
+- active optimization bundle resolution is auditable,
+- outcome-facing eval surfaces resolve task family and task adjudication policy,
 - v2 docs active,
 - baseline implementation still allowed to lag explicitly.
 
@@ -171,6 +176,16 @@ Track:
 - provenance coverage,
 - resume stability.
 
+### 5.5 Contract-Coverage Axis
+
+Track:
+
+- `learning_objective_bundle/v1` resolution,
+- task-family resolution coverage,
+- `task_adjudication_policy/v1` coverage on outcome-facing eval,
+- canonical `runtime_status` / `adjudication_status` usage,
+- benchmark-family adjudication overlay usage where relevant.
+
 ---
 
 ## 6. Required Regression Suites (`S1-S8`)
@@ -185,7 +200,9 @@ Hard block on:
 
 - runtime crash,
 - broken parser / verifier path,
-- missing required output artifact.
+- missing required output artifact,
+- missing active `learning_objective_bundle_id` on training-impacting runs,
+- missing resolved `task_adjudication_policy_id` on outcome-facing eval runs.
 
 ### S2: Structural Regression
 
@@ -198,7 +215,10 @@ Checks:
 - all `L0-L6` interfaces exist,
 - no uncontrolled State IR drift,
 - no hard-coded semantic control path replaces learned policy,
-- data constitution / profile references are internally consistent.
+- data constitution / profile references are internally consistent,
+- `learning_objective_bundle/v1` resolution is unambiguous,
+- task-family resolution and task adjudication policy attachment are unambiguous where outcome-facing evaluation is active,
+- persisted `runtime_status` and `adjudication_status` use canonical vocabularies.
 
 ### S3: Failure-Profile Regression
 
@@ -297,6 +317,9 @@ When a relevant suite is `ON`, the following are hard blocks:
 - deletion or bypass of a level interface,
 - deterministic control replacing learned policy,
 - verifier non-functionality,
+- undeclared or unresolved `learning_objective_bundle/v1` on a training-impacting change,
+- outcome-facing evaluation without resolved task family or `task_adjudication_policy/v1`,
+- non-canonical persisted `runtime_status` / `adjudication_status`,
 - credit collapse,
 - calibration degradation beyond tolerance,
 - contamination leakage beyond tolerance,
@@ -325,6 +348,9 @@ Required metadata includes:
 - `baseline_id`
 - `tolerance_profile_id`
 - mandatory docs consulted
+- `learning_objective_bundle_id` when training behavior changes
+- task-family and adjudication-policy resolution summary when outcome-facing evaluation is active
+- runtime/adjudication status breakdown when outcome-facing evaluation is active
 
 ---
 
@@ -342,7 +368,9 @@ They do not define hardware/profile promotion across `P1-P4`.
 
 - benchmark tiering and contamination disclosure exist,
 - `L0-L6` interfaces are wired,
-- `failure.credit` is emitted.
+- `failure.credit` is emitted,
+- default `learning_objective_bundle/v1` is declared,
+- outcome-facing eval surfaces can resolve task family and adjudication policy without ambiguity.
 
 ### `C -> D`
 
@@ -354,7 +382,8 @@ They do not define hardware/profile promotion across `P1-P4`.
 
 - strict held-out frontier evaluation is alive,
 - verifier evidence is strong,
-- `S8` and governance artifacts are stable.
+- `S8` and governance artifacts are stable,
+- terminal adjudication artifacts are stable on active held-out surfaces.
 
 ---
 

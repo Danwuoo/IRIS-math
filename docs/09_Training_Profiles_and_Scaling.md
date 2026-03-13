@@ -2,7 +2,7 @@
 
 **Document Type:** Active Profile Note  
 **Scope:** Staged scaling profiles for IRIS-math v2  
-**Boundary:** Exact per-run hyperparameters live in run manifests and configs; this document defines hardware/purpose profile families and intended purpose. Promotion authority lives in `docs/17_Scaling_Promotion_and_Readiness.md`.
+**Boundary:** Exact per-run hyperparameters live in run manifests and configs; this document defines hardware/purpose profile families and intended purpose. Promotion authority lives in `docs/17_Scaling_Promotion_and_Readiness.md`; learning-objective semantics live in `docs/18_Optimization_and_Learning_Contract.md`.
 
 ---
 
@@ -139,9 +139,12 @@ Every run that claims alignment with one of these profiles should emit at least:
 - hardware description
 - model-size band
 - phase
+- `default_learning_objective_bundle_map` for the active profile family
 - runtime lock manifest id / sha
 - tokenizer fingerprint
 - `data_realization_policy_id`
+- `learning_objective_bundle_id`
+- `learning_objective_bundle_resolution_source`
 - `decontam_policy_id`
 - benchmark family policy refs
 - `parser_provenance_id`
@@ -159,5 +162,6 @@ Every run that claims alignment with one of these profiles should emit at least:
 
 - `docs/07_Data_Constitution.md` defines what data is allowed and how benchmark tiers work.
 - `docs/08_Training_Run_Governance.md` defines transaction, resume, and provenance rules.
+- `docs/18_Optimization_and_Learning_Contract.md` defines which objective families and curriculum activations may be claimed for a profile.
 - `docs/06_Regression_and_Phase_Gates.md` defines what suites and gates must pass.
 - `docs/17_Scaling_Promotion_and_Readiness.md` defines whether promotion between profile families is justified.

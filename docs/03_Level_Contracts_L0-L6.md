@@ -207,6 +207,13 @@ Responsibilities:
 - propose invariants, macros, or lemma-like summaries,
 - preserve important distinctions while abstracting.
 
+Canonical landing rule:
+
+- reusable abstractions, macros, and lemma-like summaries must land in `LM`,
+- branch-scoped active invariants or compressed plans must land in `FR`,
+- claim-bearing invariant relations must land in `CG`,
+- no behavior-affecting abstraction may survive only as hidden side metadata.
+
 Typical diagnostics:
 
 - abstraction granularity,
@@ -269,3 +276,4 @@ Prohibited patterns:
 6. Has L6 retained verification plus credit routing without inventing new external levels?
 7. Are `L3` and `L6` internal heads mounted only as internal modules rather than new external ids?
 8. Is any `partial_mount` still being counted as fully mounted in regression or readiness claims?
+9. Are `L5` abstractions landing canonically in `LM`, `FR`, or `CG` rather than in side metadata?

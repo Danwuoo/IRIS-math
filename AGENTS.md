@@ -19,22 +19,23 @@ When uncertain, explicitly label **不確定**.
 Conflict rule:
 
 - System-level invariants and active authoritative contracts override design notes, archived notes, and baseline implementation behavior.
-- `docs/數學模型建議.md` is an **active strategy note**. It informs rewrites and prioritization, but once an active v2 contract exists, the contract is authoritative.
+- There is no separate active strategy-note authority above the v2 contract set; direction must be read from the active contracts and companion authorities.
 
 ---
 
 ## 1) Mandatory Reading (Always Required)
 Read these documents in this order before implementing, modifying, or reviewing anything substantial:
 
-1. `docs/數學模型建議.md`
-2. `docs/00_INDEX.md`
-3. `docs/10_Glossary_and_Normative_Status.md`
-4. `docs/13_Goals_and_Success_Criteria.md`
-5. `docs/07_Data_Constitution.md`
-6. `docs/01_Architecture_Constitution.md`
-7. `docs/02_State_IR_Spec.md`
-8. `docs/03_Level_Contracts_L0-L6.md`
-9. `docs/04_Credit_Assignment_and_Recovery.md`
+1. `docs/00_INDEX.md`
+2. `docs/10_Glossary_and_Normative_Status.md`
+3. `docs/13_Goals_and_Success_Criteria.md`
+4. `docs/07_Data_Constitution.md`
+5. `docs/01_Architecture_Constitution.md`
+6. `docs/02_State_IR_Spec.md`
+7. `docs/03_Level_Contracts_L0-L6.md`
+8. `docs/04_Credit_Assignment_and_Recovery.md`
+9. `docs/18_Optimization_and_Learning_Contract.md`
+10. `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
 
 These define the active target.
 
@@ -51,6 +52,8 @@ If the task touches metrics, regression, evaluation policy, phase gates, trainin
 - `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
 - `docs/16_Verifier_and_Formalization_Stack.md`
 - `docs/17_Scaling_Promotion_and_Readiness.md`
+- `docs/18_Optimization_and_Learning_Contract.md`
+- `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
 
 Notes:
 
@@ -78,6 +81,8 @@ Treat the following as active v2 documents:
 - `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
 - `docs/16_Verifier_and_Formalization_Stack.md`
 - `docs/17_Scaling_Promotion_and_Readiness.md`
+- `docs/18_Optimization_and_Learning_Contract.md`
+- `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
 
 ### 3.2 Documentation-First Transition Rule
 During the transition period:
@@ -102,6 +107,8 @@ You may directly edit:
 - `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
 - `docs/16_Verifier_and_Formalization_Stack.md`
 - `docs/17_Scaling_Promotion_and_Readiness.md`
+- `docs/18_Optimization_and_Learning_Contract.md`
+- `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
 - `docs/codex_plan/*`
 - `docs/repo-tree.txt`
 - `src/`

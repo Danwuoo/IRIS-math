@@ -2,7 +2,7 @@
 
 **Document Type:** Engineering Governance (Policy-Binding)  
 **Scope:** Segment transactions, exactly-once resume, runtime lock, reproducibility controls, and provenance requirements for IRIS-math v2  
-**Related active docs:** `docs/05_Eval_Metrics_Spec.md`, `docs/06_Regression_and_Phase_Gates.md`, `docs/07_Data_Constitution.md`, `docs/09_Training_Profiles_and_Scaling.md`, `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`
+**Related active docs:** `docs/05_Eval_Metrics_Spec.md`, `docs/06_Regression_and_Phase_Gates.md`, `docs/07_Data_Constitution.md`, `docs/09_Training_Profiles_and_Scaling.md`, `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`, `docs/18_Optimization_and_Learning_Contract.md`
 
 ---
 
@@ -14,6 +14,7 @@
 - Benchmark-family-specific allowances and forbidden uses are governed by `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
 - Verifier evidence interpretation is governed by `docs/16_Verifier_and_Formalization_Stack.md`.
 - Profile-readiness claims are governed by `docs/17_Scaling_Promotion_and_Readiness.md`.
+- Learning-objective family semantics are governed by `docs/18_Optimization_and_Learning_Contract.md`.
 
 ---
 
@@ -25,6 +26,7 @@ Define the run-time governance required for long mathematical training runs:
 - exactly-once progress,
 - reproducibility and runtime lock control,
 - data-realization and decontamination policy capture,
+- learning-objective bundle capture,
 - parser / formalizer / verifier provenance capture,
 - resume drift diagnosis.
 
@@ -118,6 +120,10 @@ Journal schema remains `iris.segment_journal/v1` and must stay append-only.
 | `runtime_lock_manifest_sha256` | string | Runtime provenance |
 | `data_realization_policy_id` | string | Active `data_realization_policy/v1` id |
 | `decontam_policy_id` | string | Active `decontam_policy/v1` id |
+| `learning_objective_bundle_id` | string | Active `learning_objective_bundle/v1` id |
+| `learning_objective_bundle_resolution_source` | string | `run_manifest` or `profile_phase_default` |
+| `learning_objective_bundle_ref` | string/null | Required when the bundle registry is external to the codebase |
+| `learning_objective_bundle_sha256` | string/null | Required when the bundle registry is external to the codebase |
 | `benchmark_family_policy_refs` | string/list | Active `benchmark_family_policy/v1` refs when benchmark-derived material is present |
 | `parser_provenance_id` | string/null | Required for document-derived or multimodal segments; identifies the canonical parse pipeline manifest |
 | `parser_provenance_refs` | string/object/null | Required when layout, OCR, formula parsing, or semantic-unit typing surfaces are mounted; must resolve manifest ids for each active surface |
@@ -164,6 +170,10 @@ Commit protocol:
 - `runtime_lock_manifest_sha256`
 - `data_realization_policy_id`
 - `decontam_policy_id`
+- `learning_objective_bundle_id`
+- `learning_objective_bundle_resolution_source`
+- `learning_objective_bundle_ref` when the registry is external
+- `learning_objective_bundle_sha256` when the registry is external
 - `benchmark_family_policy_refs`
 - `parser_provenance_id`
 - `parser_provenance_refs`
@@ -279,3 +289,4 @@ Each such control must include:
 - `docs/06_Regression_and_Phase_Gates.md`
 - `docs/07_Data_Constitution.md`
 - `docs/09_Training_Profiles_and_Scaling.md`
+- `docs/18_Optimization_and_Learning_Contract.md`

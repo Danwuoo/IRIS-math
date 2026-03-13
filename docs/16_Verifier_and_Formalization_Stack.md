@@ -76,12 +76,38 @@ Verifier evidence should be logged and reasoned about by class:
 4. **Formal bridge evidence**  
    Evidence produced when a statement or proof segment survives a formal or semi-formal checking bridge.
 
+Canonical evidence-class ids:
+
+- `local_validity`
+- `gap`
+- `counterexample`
+- `formal_bridge`
+
 Evidence should also carry:
 
 - provenance,
 - coverage scope,
 - strength/confidence,
 - whether it is positive, negative, or mixed evidence.
+
+### 2.1 Minimum Evidence Bundles by Task Family
+
+`task_adjudication_policy/v1.required_evidence_classes` must be chosen from the evidence classes defined here and must satisfy at least the following default bundles unless a stricter policy is declared.
+
+| Task family | Minimum required evidence classes | Supportive but not sufficient by itself | Default abstention trigger |
+| --- | --- | --- | --- |
+| `answer_only` | `local_validity` or equivalent direct answer-validation evidence | `counterexample`, `gap` when rationale exists, `formal_bridge` when a checker exists | answer candidate exists but no decisive validity evidence is available |
+| `answer_with_rationale` | `local_validity`; `counterexample` when rationale can contradict the answer | `gap`, `formal_bridge` | answer candidate exists but rationale safety or answer validity remains unresolved without decisive invalidation |
+| `proof_natural_language` | `gap` plus `local_validity` | `counterexample`, `formal_bridge` | critical obligations remain unresolved without decisive failure |
+| `proof_semi_formal` | `gap`, `local_validity`, and bridge-coverage evidence; `formal_bridge` is required when the claimed surface mounts it | `counterexample` | bridge coverage or proof obligations are insufficient for a trustworthy verdict |
+| `formalization` | `formal_bridge` with checker or bridge verdict | `local_validity`, `gap`, `counterexample` as diagnostics only | checker unavailable, translation coverage incomplete, or bridge verdict cannot be trusted |
+| `counterexample_or_construction` | `local_validity` sufficient to validate the witness or construction; `formal_bridge` when the witness itself is formal | `counterexample`, `gap` | witness exists but constraint validation is incomplete |
+
+Rules:
+
+1. Stronger evidence may supplement but not silently replace a required evidence class with a non-equivalent signal.
+2. Missing required evidence defaults to abstention unless decisive negative evidence already supports rejection.
+3. Family-specific benchmark overlays may tighten these bundles but may not weaken them.
 
 ---
 
@@ -116,6 +142,7 @@ Its job is to support:
 - readiness and promotion claims.
 
 Eval-time evidence must therefore be auditable and stable enough to survive adversarial or reformulated cases.
+Final acceptance is resolved through the active task adjudication policy in `docs/19_Runtime_and_Task_Adjudication_Semantics.md`; verifier evidence is the decisive evidence surface, not a freestanding substitute for adjudication policy.
 
 Training labels and eval evidence must not be conflated.
 
@@ -237,3 +264,4 @@ This document does not:
 - `docs/05_Eval_Metrics_Spec.md`
 - `docs/06_Regression_and_Phase_Gates.md`
 - `docs/17_Scaling_Promotion_and_Readiness.md`
+- `docs/19_Runtime_and_Task_Adjudication_Semantics.md`

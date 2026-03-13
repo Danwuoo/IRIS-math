@@ -2,7 +2,7 @@
 
 **Document Type:** Active Companion Authority  
 **Scope:** Benchmark-family registry, allowed tier placements, train-visible granularity, held-out governance, and forbidden uses for IRIS-math v2  
-**Boundary:** This document governs benchmark families. It does not replace the global tier definitions in `docs/07_Data_Constitution.md` or phase/suite semantics in `docs/06_Regression_and_Phase_Gates.md`.
+**Boundary:** This document governs benchmark families. It does not replace the global tier definitions in `docs/07_Data_Constitution.md`, phase/suite semantics in `docs/06_Regression_and_Phase_Gates.md`, or task-family adjudication semantics in `docs/19_Runtime_and_Task_Adjudication_Semantics.md`.
 
 ---
 
@@ -15,6 +15,7 @@ This document is the single authoritative registry for:
 - which benchmark families exist as named governance objects,
 - which tiers each family may occupy,
 - what train-visible exposure is allowed,
+- what default task-family posture and adjudication overlays apply,
 - how homologous and strict held-out splits are defined,
 - what uses remain forbidden.
 
@@ -56,6 +57,9 @@ Minimum fields:
 | `cluster_exclusion_key` | fingerprint or family key used to keep homologous clusters disjoint |
 | `tier3_strict_holdout_source_id` | strict held-out source identity when Tier 3 is allowed |
 | `decontam_policy_id` | referenced `decontam_policy/v1` |
+| `default_task_family_map` | family-level default mapping from item subtype or eval surface to canonical task family |
+| `task_adjudication_policy_refs` | declared default `task_adjudication_policy/v1` refs used by the family |
+| `benchmark_family_adjudication_overrides` | family-specific tightening rules that specialize, but do not replace, task-family adjudication |
 | `tuning_visible_surfaces` | surfaces that may be inspected during curriculum shaping or early diagnostics |
 | `tuning_observe_only_surfaces` | aggregate surfaces allowed only as bounded regression checks |
 | `tuning_blocked_surfaces` | surfaces forbidden from routine tuning or leaderboard chasing |
@@ -67,6 +71,7 @@ Rules:
 1. Tier 3 surfaces must always appear in `tuning_blocked_surfaces`.
 2. If Tier 1 is allowed, Tier 2 must exist and remain train-hidden.
 3. Derivative families must carry distinct identities and may not be described as silent exposure to the original family.
+4. Outcome-facing family usage is non-compliant until default task-family posture and adjudication-policy attachment are declared.
 
 ---
 
@@ -74,13 +79,24 @@ Rules:
 
 ### 2.1 Registry Summary
 
-| Benchmark Family | Primary Role | Allowed Tier(s) | Tier 1 Mode | Tier 2 Homology Signature | Strict Held-Out Source | Allowed Phases |
-| --- | --- | --- | --- | --- | --- | --- |
-| `AIMO` | Outcome-facing contest family | `Tier 1`, `Tier 2`, `Tier 3` | structural labels + short process fragments only | `problem_type` + `proof_pattern` + `difficulty_band`; theorem-family key only when recoverable | private-like or post-cutoff unseen contest pool | `B-E` |
-| `Omni-MATH` | Curriculum + eval family | `Tier 1`, `Tier 2`, `Tier 3` | structural labels + process fragments + bounded proof-shape fragments | `problem_type` + `proof_pattern` + `difficulty_band`; theorem-family key when annotated | strict held-out plus reformulated held-out Omni-MATH-style split | `B-E` |
-| `miniF2F` | Formal-bridge family | `Tier 1`, `Tier 2`, `Tier 3` | structural labels + theorem statements + proof-shape fragments + aligned formal snippets | `theorem_family` + `proof_pattern` + `difficulty_band`; library lineage stays in the split firewall | strict held-out formal benchmark split | `B-E` |
-| `FrontierMath` | Frontier outcome family | original family is `Tier 3` only; Tier 1 allowed only on separately declared derivative families | none on the original family | n/a on the original family; derivative family required if Tier 1 exists | original strict held-out FrontierMath set or equivalent unseen frontier pool | `D-E` |
-| `ARC compatibility probes` | Compatibility-only transition family | `Tier 2`, `Tier 3` compatibility probes only | none | legacy compatibility split | strict compatibility probe split | `C-E` |
+| Benchmark Family | Primary Role | Allowed Tier(s) | Tier 1 Mode | Default Task-Family Posture | Tier 2 Homology Signature | Strict Held-Out Source | Allowed Phases |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `AIMO` | Outcome-facing contest family | `Tier 1`, `Tier 2`, `Tier 3` | structural labels + short process fragments only | `answer_only` by default; `answer_with_rationale` where rationale is explicitly scored or emitted | `problem_type` + `proof_pattern` + `difficulty_band`; theorem-family key only when recoverable | private-like or post-cutoff unseen contest pool | `B-E` |
+| `Omni-MATH` | Curriculum + eval family | `Tier 1`, `Tier 2`, `Tier 3` | structural labels + process fragments + bounded proof-shape fragments | mixed family; item-level resolution required across answer-bearing and proof-bearing tasks | `problem_type` + `proof_pattern` + `difficulty_band`; theorem-family key when annotated | strict held-out plus reformulated held-out Omni-MATH-style split | `B-E` |
+| `miniF2F` | Formal-bridge family | `Tier 1`, `Tier 2`, `Tier 3` | structural labels + theorem statements + proof-shape fragments + aligned formal snippets | `proof_semi_formal` or `formalization` depending bridge/checker surface | `theorem_family` + `proof_pattern` + `difficulty_band`; library lineage stays in the split firewall | strict held-out formal benchmark split | `B-E` |
+| `FrontierMath` | Frontier outcome family | original family is `Tier 3` only; Tier 1 allowed only on separately declared derivative families | none on the original family | explicit item declaration required on the original family; derivative families must declare their own defaults | n/a on the original family; derivative family required if Tier 1 exists | original strict held-out FrontierMath set or equivalent unseen frontier pool | `D-E` |
+| `ARC compatibility probes` | Compatibility-only transition family | `Tier 2`, `Tier 3` compatibility probes only | none | compatibility-only; not authoritative for active task-family adjudication | legacy compatibility split | strict compatibility probe split | `C-E` |
+
+### 2.1.1 Benchmark-Family Adjudication Attachment
+
+Rules:
+
+1. A registered family must declare either:
+   - default task-family mappings for its item subtypes, or
+   - that item-level task-family resolution is mandatory.
+2. A family may attach default `task_adjudication_policy/v1` refs or benchmark-family tightening overlays, but those overlays may only tighten the resolved task-family policy.
+3. Mixed families such as `Omni-MATH` may not rely on one family-wide adjudication rule across heterogeneous item types.
+4. A family policy may require stronger abstention or stronger verifier modes than the task-family default, but it may not relax required evidence bundles defined by `docs/16` and `docs/19`.
 
 ### 2.2 Tier 1 Admission Matrix
 
@@ -132,6 +148,12 @@ This matrix answers what may become train-visible for the currently registered f
 - `tuning_observe_only_surfaces`: fixed-cadence family-level Tier 2 aggregate metrics and generalization gap
 - `tuning_blocked_surfaces`: all Tier 3 surfaces, all item-level Tier 2 outputs, per-contest breakdowns, and any hidden solution text or proof traces from Tier 2 / Tier 3
 
+**Adjudication posture**
+
+- default task family is `answer_only`
+- use `answer_with_rationale` only when the eval surface explicitly scores or requires rationale-bearing output
+- family overlays may tighten abstention on unresolved answer validity but may not weaken answer-check evidence requirements
+
 **Forbidden uses**
 
 - architecture definition
@@ -176,6 +198,12 @@ This matrix answers what may become train-visible for the currently registered f
 - `tuning_observe_only_surfaces`: fixed-cadence family-level Tier 2 aggregate metrics and generalization gap
 - `tuning_blocked_surfaces`: all Tier 3 surfaces, all item-level Tier 2 outputs, homology-axis-aligned held-out slices, and full held-out solution traces
 
+**Adjudication posture**
+
+- `Omni-MATH` is mixed-family by default
+- item-level task-family resolution is required across answer-bearing and proof-bearing items
+- family overlays may tighten verifier mode or abstention on proof-bearing items but may not collapse all items into one answer-only policy
+
 **Forbidden uses**
 
 - using Tier 1 exposure as final evidence
@@ -218,6 +246,12 @@ This matrix answers what may become train-visible for the currently registered f
 - `tuning_visible_surfaces`: Tier 1 usage ratios, contamination summaries, provenance coverage
 - `tuning_observe_only_surfaces`: fixed-cadence family-level Tier 2 aggregate metrics, proof-validity calibration, and theorem-family generalization gap
 - `tuning_blocked_surfaces`: all Tier 3 surfaces, all item-level Tier 2 theorem texts, proof scripts, checker traces, and library-specific hidden leaderboards
+
+**Adjudication posture**
+
+- default task families are `proof_semi_formal` and `formalization`
+- checker-backed or bridge-backed evidence is mandatory on the surfaces that claim formalization success
+- family overlays may tighten bridge coverage and abstention rules but may not accept theorem plausibility without the declared checker surface
 
 **Forbidden uses**
 
@@ -265,6 +299,12 @@ This matrix answers what may become train-visible for the currently registered f
 - `tuning_visible_surfaces`: none on the original family
 - `tuning_observe_only_surfaces`: none on the original family; derivative families may expose fixed-cadence aggregate Tier 2 metrics only after separate registration
 - `tuning_blocked_surfaces`: all original FrontierMath metrics, items, explanations, and slice breakdowns during tuning, checkpoint selection, or curriculum shaping
+
+**Adjudication posture**
+
+- original FrontierMath requires explicit item-level task-family declaration on outcome-facing eval
+- derivative families must publish their own task-family defaults and adjudication overlays
+- frontier-family overlays may tighten abstention and verifier requirements, but they may not relax task-family evidence bundles
 
 **Forbidden uses**
 
@@ -335,7 +375,13 @@ Minimum rules:
 - Tier 2 surfaces may support periodic regression and generalization checks only through declared `tuning_observe_only_surfaces`; item-level or homology-axis-aligned drill-down is blocked.
 - Tier 3 surfaces are blocked from curriculum tuning and routine leaderboard optimization.
 
-### 3.4.1 Tuning-Blocked Surfaces Once Benchmark Exposure Exists
+### 3.4.1 Benchmark-Adjudication Overlay Rule
+
+1. Benchmark-family overlays may tighten abstention posture, verifier mode, or evidence requirements, but they may not weaken a resolved task-family policy.
+2. Benchmark-family overlays may not use hidden item-level ground truth as a silent acceptance teacher.
+3. If a family changes its adjudication overlay in a behavior-affecting way, the `benchmark_family_policy/v1` object must receive a new immutable identity.
+
+### 3.4.2 Tuning-Blocked Surfaces Once Benchmark Exposure Exists
 
 Once a family has Tier 1 exposure, the following remain tuning-blocked unless a stricter family rule already blocks more:
 
@@ -391,6 +437,8 @@ If benchmark usage cannot be explained in terms of:
 - declared family registry entry,
 - declared tier placement,
 - declared train-visible granularity,
+- declared task-family posture,
+- declared adjudication overlays,
 - declared decontamination method,
 - declared held-out sources,
 - declared tuning-visible, observe-only, and tuning-blocked surfaces,

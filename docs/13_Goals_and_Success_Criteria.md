@@ -165,4 +165,6 @@ The following cases still count as failure even if headline score improves:
 - `docs/07_Data_Constitution.md` defines what data may be used and under what contamination controls.
 - `docs/15_Benchmark_Registry_and_Tiering_Playbook.md` defines benchmark-family-specific tiering and forbidden uses.
 - `docs/16_Verifier_and_Formalization_Stack.md` defines verifier evidence and false accept / false reject handling.
+- `docs/18_Optimization_and_Learning_Contract.md` defines how learning pressure may be applied while preserving level-addressable capability growth.
+- `docs/19_Runtime_and_Task_Adjudication_Semantics.md` defines how accepted outcomes are adjudicated across answer-bearing, proof-bearing, and formalization-bearing task families.
 - `docs/17_Scaling_Promotion_and_Readiness.md` defines when larger profiles are justified.

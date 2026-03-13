@@ -21,31 +21,32 @@ When active v2 docs and baseline implementation disagree, the docs win.
 
 ## 2. Active v2 Document Set
 
-### 2.1 Strategy and Navigation
+### 2.1 Navigation
 
-1. `docs/數學模型建議.md`
-2. `docs/00_INDEX.md`
-3. `docs/10_Glossary_and_Normative_Status.md`
+1. `docs/00_INDEX.md`
+2. `docs/10_Glossary_and_Normative_Status.md`
 
 ### 2.2 Active Core Spine and Primary Policy
 
-4. `docs/13_Goals_and_Success_Criteria.md`
-5. `docs/07_Data_Constitution.md`
-6. `docs/01_Architecture_Constitution.md`
-7. `docs/02_State_IR_Spec.md`
-8. `docs/03_Level_Contracts_L0-L6.md`
-9. `docs/04_Credit_Assignment_and_Recovery.md`
-10. `docs/05_Eval_Metrics_Spec.md`
-11. `docs/06_Regression_and_Phase_Gates.md`
-12. `docs/08_Training_Run_Governance.md`
-13. `docs/09_Training_Profiles_and_Scaling.md`
+3. `docs/13_Goals_and_Success_Criteria.md`
+4. `docs/07_Data_Constitution.md`
+5. `docs/01_Architecture_Constitution.md`
+6. `docs/02_State_IR_Spec.md`
+7. `docs/03_Level_Contracts_L0-L6.md`
+8. `docs/04_Credit_Assignment_and_Recovery.md`
+9. `docs/05_Eval_Metrics_Spec.md`
+10. `docs/06_Regression_and_Phase_Gates.md`
+11. `docs/08_Training_Run_Governance.md`
+12. `docs/09_Training_Profiles_and_Scaling.md`
 
 ### 2.3 Active Companion Docs
 
-14. `docs/14_Multimodal_Document_Pipeline.md`
-15. `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
-16. `docs/16_Verifier_and_Formalization_Stack.md`
-17. `docs/17_Scaling_Promotion_and_Readiness.md`
+13. `docs/14_Multimodal_Document_Pipeline.md`
+14. `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
+15. `docs/16_Verifier_and_Formalization_Stack.md`
+16. `docs/17_Scaling_Promotion_and_Readiness.md`
+17. `docs/18_Optimization_and_Learning_Contract.md`
+18. `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
 
 ### 2.4 Archive
 
@@ -60,15 +61,16 @@ Archive notes may mention legacy `StateIR(T,G,O,R,X,M)` or ARC-specific semantic
 
 ### 3.1 Default Implementation Path
 
-1. `docs/數學模型建議.md`
-2. `docs/00_INDEX.md`
-3. `docs/10_Glossary_and_Normative_Status.md`
-4. `docs/13_Goals_and_Success_Criteria.md`
-5. `docs/07_Data_Constitution.md`
-6. `docs/01_Architecture_Constitution.md`
-7. `docs/02_State_IR_Spec.md`
-8. `docs/03_Level_Contracts_L0-L6.md`
-9. `docs/04_Credit_Assignment_and_Recovery.md`
+1. `docs/00_INDEX.md`
+2. `docs/10_Glossary_and_Normative_Status.md`
+3. `docs/13_Goals_and_Success_Criteria.md`
+4. `docs/07_Data_Constitution.md`
+5. `docs/01_Architecture_Constitution.md`
+6. `docs/02_State_IR_Spec.md`
+7. `docs/03_Level_Contracts_L0-L6.md`
+8. `docs/04_Credit_Assignment_and_Recovery.md`
+9. `docs/18_Optimization_and_Learning_Contract.md`
+10. `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
 
 ### 3.2 Conditional Companion Reading
 
@@ -78,30 +80,33 @@ Add the following when relevant:
 - `docs/15_Benchmark_Registry_and_Tiering_Playbook.md` for benchmark use, contamination controls, homologous split policy, or training/eval governance involving benchmark families
 - `docs/16_Verifier_and_Formalization_Stack.md` for verifier behavior, formalization, proof validity, false accept / false reject policy, or recovery behavior tied to verifier evidence
 - `docs/17_Scaling_Promotion_and_Readiness.md` for scaling, profile promotion, readiness claims, or profile-to-profile advancement
+- `docs/18_Optimization_and_Learning_Contract.md` for learning-objective design, level-addressable losses, curriculum activation, or control/verifier learning semantics
+- `docs/19_Runtime_and_Task_Adjudication_Semantics.md` for runtime loop behavior, stopping semantics, task-family adjudication, verifier-mode binding, or accepted-output policy
 
 Add `docs/05`, `docs/06`, `docs/08`, and `docs/09` whenever the task touches metrics, regression, training governance, scaling, or eval policy.
 
 ### 3.3 Training / Evaluation Path
 
-1. `docs/數學模型建議.md`
-2. `docs/10_Glossary_and_Normative_Status.md`
-3. `docs/13_Goals_and_Success_Criteria.md`
-4. `docs/07_Data_Constitution.md`
-5. `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
-6. `docs/16_Verifier_and_Formalization_Stack.md`
-7. `docs/05_Eval_Metrics_Spec.md`
-8. `docs/06_Regression_and_Phase_Gates.md`
-9. `docs/08_Training_Run_Governance.md`
-10. `docs/09_Training_Profiles_and_Scaling.md`
-11. `docs/17_Scaling_Promotion_and_Readiness.md`
+1. `docs/10_Glossary_and_Normative_Status.md`
+2. `docs/13_Goals_and_Success_Criteria.md`
+3. `docs/07_Data_Constitution.md`
+4. `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
+5. `docs/16_Verifier_and_Formalization_Stack.md`
+6. `docs/18_Optimization_and_Learning_Contract.md`
+7. `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
+8. `docs/05_Eval_Metrics_Spec.md`
+9. `docs/06_Regression_and_Phase_Gates.md`
+10. `docs/08_Training_Run_Governance.md`
+11. `docs/09_Training_Profiles_and_Scaling.md`
+12. `docs/17_Scaling_Promotion_and_Readiness.md`
 
 ---
 
 ## 4. Authority and Transition Reminder
 
 - `docs/01` through `docs/09` define the active v2 core spine and primary policy surfaces.
-- `docs/13` through `docs/17` are active companion docs that elaborate goals, multimodal pipeline rules, benchmark family governance, verifier stack policy, and scaling readiness.
-- `docs/數學模型建議.md` is the active strategy note used to prioritize rewrites.
+- `docs/13` through `docs/19` are active companion docs that elaborate goals, multimodal pipeline rules, benchmark family governance, verifier stack policy, scaling readiness, learning semantics, and runtime/adjudication semantics.
+- There is no separate active strategy-note authority above the contract set.
 - `docs/11_Phase_D_Diagnostics_Design_Note.md` and `docs/12_Phase_E_Execution_Design_Note.md` are **archive notes**, not active reading requirements.
 - `docs/codex_plan/*` is workflow guidance only.
 
@@ -115,6 +120,7 @@ These entries are kept to preserve old references only.
 | --- | --- | --- |
 | `docs/07_Data_Mixture_and_Ingestion.md` | `docs/07_Data_Constitution.md` | renamed |
 | `docs/09_Training_Profile_SingleH100_3B.md` | `docs/09_Training_Profiles_and_Scaling.md` | renamed |
+| `docs/數學模型建議.md` | retired; direction is now carried by the active contract set plus `docs/18` and `docs/19` | retired |
 | `docs/11_Phase_D_Diagnostics_Design_Note.md` | archive only | archived |
 | `docs/12_Phase_E_Execution_Design_Note.md` | archive only | archived |
 

@@ -32,7 +32,6 @@ _S8_MONITORED_METRICS: Tuple[str, ...] = (
     "process.failure_distribution_entropy",
 )
 _MANDATORY_DOCS: Tuple[str, ...] = (
-    "docs/數學模型建議.md",
     "docs/00_INDEX.md",
     "docs/10_Glossary_and_Normative_Status.md",
     "docs/13_Goals_and_Success_Criteria.md",
@@ -41,6 +40,8 @@ _MANDATORY_DOCS: Tuple[str, ...] = (
     "docs/02_State_IR_Spec.md",
     "docs/03_Level_Contracts_L0-L6.md",
     "docs/04_Credit_Assignment_and_Recovery.md",
+    "docs/18_Optimization_and_Learning_Contract.md",
+    "docs/19_Runtime_and_Task_Adjudication_Semantics.md",
     "docs/05_Eval_Metrics_Spec.md",
     "docs/06_Regression_and_Phase_Gates.md",
     "docs/08_Training_Run_Governance.md",

@@ -3,7 +3,7 @@
 **Document Type:** Canonical Binding Policy  
 **Audience:** Model, training, evaluation, parser, formalizer, and verifier pipelines  
 **Scope:** Canonical metric names, field semantics, and required metadata for IRIS-math v2  
-**Companion authority:** `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`
+**Companion authority:** `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`, `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
 
 ---
 
@@ -22,6 +22,7 @@ Suite activation lives in `docs/06_Regression_and_Phase_Gates.md`.
 Benchmark-family-specific governance lives in `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
 Verifier evidence classes and false accept / false reject policy live in `docs/16_Verifier_and_Formalization_Stack.md`.
 Profile-readiness promotion claims live in `docs/17_Scaling_Promotion_and_Readiness.md`.
+Task-family acceptance and terminal adjudication semantics live in `docs/19_Runtime_and_Task_Adjudication_Semantics.md`.
 
 ---
 
@@ -45,7 +46,7 @@ Optimization priority remains:
 
 | Metric | Type | Description |
 | --- | --- | --- |
-| `task.success` | bool | Final output accepted by the active verifier policy |
+| `task.success` | bool | Final output accepted by the active task adjudication policy |
 | `task.validity_score` | float | Continuous validity score |
 | `task.confidence` | float | Calibrated confidence |
 | `task.proof_validity_score` | float | Proof-validity score when proof-bearing output exists |
@@ -53,8 +54,9 @@ Optimization priority remains:
 
 Rules:
 
-- `task.success` must come from verifier logic or an explicitly declared evaluation policy, not raw label lookup.
+- `task.success` must come from verifier logic interpreted through the active `task_adjudication_policy/v1` or an explicitly declared evaluation policy, not raw label lookup.
 - `task.confidence` must remain separable from correctness.
+- Any persisted accepted or rejected attempt must use the canonical `runtime_status` and `adjudication_status` vocabularies defined in `docs/19_Runtime_and_Task_Adjudication_Semantics.md`.
 
 ---
 
@@ -260,6 +262,12 @@ Per-attempt or per-segment logging must preserve:
 - `baseline_id`
 - `tolerance_profile_id`
 - `failure.credit`
+- `task_family` where runtime adjudication is active
+- `task_adjudication_policy_id` where runtime adjudication is active
+- `task_adjudication_policy_resolution_source` where runtime adjudication is active
+- `runtime_status` and `adjudication_status` where runtime adjudication is active
+- `task_family_resolution_source` where mixed-family benchmark or eval surfaces are active
+- `benchmark_family_override_ref` where benchmark-family adjudication tightening is active
 - benchmark tier id where relevant
 - parser provenance id where relevant
 - formalizer version where relevant
