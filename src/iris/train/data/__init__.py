@@ -1,3 +1,4 @@
+from .aimo3 import AIMO3DatasetError, AIMO3Item, AIMO3LocalDataset, load_aimo3_local_dataset
 from .policies import (
     BenchmarkFamilyPolicy,
     DataPolicyBundle,
@@ -56,6 +57,9 @@ from .token_accounting import (
 )
 
 __all__ = [
+    "AIMO3DatasetError",
+    "AIMO3Item",
+    "AIMO3LocalDataset",
     "BenchmarkFamilyPolicy",
     "DataPolicyBundle",
     "DataRealizationPolicy",
@@ -96,6 +100,7 @@ __all__ = [
     "evaluate_text_quality",
     "load_default_policy_bundle",
     "load_default_pure_lm_profile",
+    "load_aimo3_local_dataset",
     "load_math_document_projection",
     "load_math_document_record",
     "load_math_document_source",

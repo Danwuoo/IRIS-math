@@ -63,46 +63,6 @@ def _resolve_suite_payload(
     return {"status": "FAIL", "suite": suite_key, "returncode": record.get("returncode")}
 
 
-def _ensure_arc_probe_artifact(
-    *,
-    model_run_dir: Path,
-    tasks_dir: Path,
-    output_dir: Path,
-    device: str,
-    seed: int,
-    max_reasoning_cycles: int,
-    termination_threshold: float,
-) -> Path:
-    probe_dir = output_dir / "arc_probe"
-    command = [
-        sys.executable,
-        "scripts/run_arc_benchmark_probe.py",
-        "--model-run-dir",
-        str(model_run_dir),
-        "--tasks-dir",
-        str(tasks_dir),
-        "--output-dir",
-        str(probe_dir),
-        "--seed",
-        str(seed),
-        "--max-reasoning-cycles",
-        str(max_reasoning_cycles),
-        "--termination-threshold",
-        str(termination_threshold),
-        "--device",
-        str(device),
-        "--no-hard-fail",
-    ]
-    result = subprocess.run(command, capture_output=True, text=True)
-    if result.returncode not in (0, 1):
-        raise RuntimeError(f"arc benchmark probe command failed unexpectedly: rc={result.returncode}")
-
-    artifact_path = probe_dir / "arc_benchmark_probe.json"
-    if not artifact_path.exists():
-        raise RuntimeError(f"arc benchmark probe artifact missing: {artifact_path}")
-    return artifact_path
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate Phase E gate artifacts and report.")
     parser.add_argument("--phase", type=str, default="E")
@@ -125,22 +85,29 @@ def main() -> int:
         help="Root directory for local S8 packet artifacts.",
     )
     parser.add_argument(
+        "--document-fixtures",
+        type=Path,
+        default=Path("tests/fixtures/p1_phase_de/document_eval"),
+        help="Math-native document eval fixture root.",
+    )
+    parser.add_argument(
+        "--proof-fixtures",
+        type=Path,
+        default=Path("tests/fixtures/p1_phase_de/proof_eval"),
+        help="Math-native proof eval fixture root.",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("artifacts/phase_e_gate_20260303/report"),
     )
-    parser.add_argument("--conceptarc-corpus", type=Path, default=Path("tools/ConceptARC/corpus"))
-    parser.add_argument("--rearc-tasks", type=Path, default=Path("data/arc/re_arc/tasks"))
-    parser.add_argument(
-        "--benchmark-tasks-dir",
-        type=Path,
-        default=Path("tools/arc-agi-benchmarking/data/sample/tasks"),
-    )
+    parser.add_argument("--conceptarc-corpus", type=Path, default=None)
+    parser.add_argument("--rearc-tasks", type=Path, default=None)
     parser.add_argument(
         "--arc-benchmark-probe",
         type=Path,
         default=None,
-        help="Use existing arc_benchmark_probe.json; if omitted, probe is generated automatically.",
+        help="Optional ARC benchmark probe compatibility appendix.",
     )
     parser.add_argument("--pairing-policy", type=str, default="adjacent", choices=["adjacent"])
     parser.add_argument("--baseline-id", type=str, default="phase-e-v1")
@@ -189,7 +156,7 @@ def main() -> int:
         phase="E",
         baseline_id=args.baseline_id,
         tolerance_profile_id=args.tolerance_profile_id,
-        change_class="Capability expansion (Phase E streaming pretrain + benchmark bridge)",
+        change_class="Capability expansion (Phase E strict held-out proof/verifier packet)",
     )
     tolerances = Tolerances(
         metric_epsilon=args.metric_epsilon,
@@ -266,18 +233,6 @@ def main() -> int:
         s2_reasons.append("Fallback artifact used for S2/S2M; strict gate forbids fallback pass.")
         s2_status = "FAIL"
 
-    arc_benchmark_probe_path = args.arc_benchmark_probe
-    if arc_benchmark_probe_path is None:
-        arc_benchmark_probe_path = _ensure_arc_probe_artifact(
-            model_run_dir=args.model_run_dir,
-            tasks_dir=args.benchmark_tasks_dir,
-            output_dir=args.output_dir,
-            device=args.device,
-            seed=args.seed,
-            max_reasoning_cycles=args.max_reasoning_cycles,
-            termination_threshold=args.termination_threshold,
-        )
-
     result = run_phase_e_gate(
         context=context,
         tolerances=tolerances,
@@ -303,10 +258,12 @@ def main() -> int:
         max_reasoning_cycles=args.max_reasoning_cycles,
         termination_threshold=args.termination_threshold,
         seed=args.seed,
-        arc_benchmark_probe_path=Path(arc_benchmark_probe_path),
+        arc_benchmark_probe_path=args.arc_benchmark_probe,
         pairing_policy=args.pairing_policy,
         freeze_baseline=args.freeze_baseline,
         hard_fail=args.hard_fail,
+        document_fixture_root=args.document_fixtures,
+        proof_fixture_root=args.proof_fixtures,
     )
 
     summary = dict(result.get("summary_report", {}))
@@ -318,7 +275,7 @@ def main() -> int:
                 "status": summary.get("regression.status", "FAIL"),
                 "suite_status": suite_status,
                 "report_path": report_path,
-                "arc_benchmark_probe_path": str(Path(arc_benchmark_probe_path).resolve()),
+                "arc_benchmark_probe_path": str(Path(args.arc_benchmark_probe).resolve()) if args.arc_benchmark_probe else "",
             },
             sort_keys=True,
         )

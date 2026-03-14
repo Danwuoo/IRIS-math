@@ -19,6 +19,17 @@ from .phase_c_gate import (
     utc_now_iso,
     write_phase_c_gate_artifacts,
 )
+from .math_native_fixtures import (
+    DocumentEvalFixture,
+    MathNativeFixtureValidationError,
+    ProofEvalFixture,
+    load_document_eval_fixture,
+    load_document_eval_fixtures,
+    load_proof_eval_fixture,
+    load_proof_eval_fixtures,
+    validate_document_eval_fixture,
+    validate_proof_eval_fixture,
+)
 
 _OPTIONAL_EXPORTS = {
     "build_concept_breakdown_v2": ("iris.regression.phase_d_gate", "build_concept_breakdown_v2"),
@@ -52,6 +63,15 @@ __all__ = [
     "evaluate_s8_status",
     "utc_now_iso",
     "write_phase_c_gate_artifacts",
+    "DocumentEvalFixture",
+    "MathNativeFixtureValidationError",
+    "ProofEvalFixture",
+    "load_document_eval_fixture",
+    "load_document_eval_fixtures",
+    "load_proof_eval_fixture",
+    "load_proof_eval_fixtures",
+    "validate_document_eval_fixture",
+    "validate_proof_eval_fixture",
     "build_concept_breakdown_v2",
     "build_failure_profile_diff_v2",
     "build_paired_representation_diff_v2",
@@ -72,7 +92,7 @@ def __getattr__(name: str):
         module = import_module(module_name)
     except Exception as error:  # pragma: no cover - optional dependency failure
         raise RuntimeError(
-            "Phase D/E regression exports require the optional JAX-backed ARC compatibility stack."
+            "Phase D/E regression exports could not be imported."
         ) from error
     value = getattr(module, attr_name)
     globals()[name] = value

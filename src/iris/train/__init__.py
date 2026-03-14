@@ -1,6 +1,9 @@
 from importlib import import_module
 
 from .data import (
+    AIMO3DatasetError,
+    AIMO3Item,
+    AIMO3LocalDataset,
     BenchmarkFamilyPolicy,
     DataPolicyBundle,
     DataRealizationPolicy,
@@ -15,6 +18,7 @@ from .data import (
     admit_p1_train_visible_record,
     build_document_slice_id,
     build_document_pipeline_bundle,
+    load_aimo3_local_dataset,
     load_default_policy_bundle,
     load_default_pure_lm_profile,
     load_policy_bundle,
@@ -38,6 +42,9 @@ from .objectives import (
 )
 
 __all__ = [
+    "AIMO3DatasetError",
+    "AIMO3Item",
+    "AIMO3LocalDataset",
     "BenchmarkFamilyPolicy",
     "DataPolicyBundle",
     "DataRealizationPolicy",
@@ -62,6 +69,7 @@ __all__ = [
     "evaluate_latest_run",
     "load_default_policy_bundle",
     "load_default_pure_lm_profile",
+    "load_aimo3_local_dataset",
     "load_learning_objective_bundle",
     "load_learning_objective_bundle_registry",
     "load_policy_bundle",

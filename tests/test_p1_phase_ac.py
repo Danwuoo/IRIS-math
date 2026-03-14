@@ -41,15 +41,23 @@ def test_learning_objective_bundle_registry_resolves_p1_phase_defaults() -> None
     assert default_map["P1:A"] == "p1-phase-a-bundle-v1"
     assert default_map["P1:B"] == "p1-phase-b-bundle-v1"
     assert default_map["P1:C"] == "p1-phase-c-bundle-v1"
+    assert default_map["P1:D"] == "p1-phase-d-bundle-v1"
+    assert default_map["P1:E"] == "p1-phase-e-bundle-v1"
     assert bundles["p1-phase-c-bundle-v1"].objective_families
 
     bundle_a, source_a = resolve_learning_objective_bundle(profile_id="P1", phase="A")
     bundle_c, source_c = resolve_learning_objective_bundle(profile_id="P1", phase="C")
+    bundle_d, source_d = resolve_learning_objective_bundle(profile_id="P1", phase="D")
+    bundle_e, source_e = resolve_learning_objective_bundle(profile_id="P1", phase="E")
 
     assert bundle_a.learning_objective_bundle_id == "p1-phase-a-bundle-v1"
     assert bundle_c.learning_objective_bundle_id == "p1-phase-c-bundle-v1"
+    assert bundle_d.learning_objective_bundle_id == "p1-phase-d-bundle-v1"
+    assert bundle_e.learning_objective_bundle_id == "p1-phase-e-bundle-v1"
     assert source_a == "profile_phase_default"
     assert source_c == "profile_phase_default"
+    assert source_d == "profile_phase_default"
+    assert source_e == "profile_phase_default"
 
 
 def test_phase_a_allows_zero_tier1_cap_but_marks_tier1_record_non_train_visible() -> None:

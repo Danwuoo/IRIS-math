@@ -19,6 +19,7 @@ from .document_records import (
 )
 
 _DOCX_NAMESPACE = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff", ".svg"}
 
 
 class DocumentPipelineError(ValueError):
@@ -171,6 +172,33 @@ def _build_pdf_record(
     return validate_math_document_record(record_payload)
 
 
+def _normalize_source_format(
+    source_path: Path,
+    *,
+    source_format_override: str | None,
+    sidecar_payload: Mapping[str, Any] | None,
+) -> str:
+    override = str(source_format_override or "").strip()
+    if override:
+        return override.upper()
+
+    if isinstance(sidecar_payload, Mapping):
+        sidecar_format = str(sidecar_payload.get("source_format", "")).strip()
+        if sidecar_format:
+            return sidecar_format.upper()
+
+    suffix = source_path.suffix.lower()
+    if suffix == ".pdf":
+        return "PDF"
+    if suffix == ".docx":
+        return "DOCX"
+    if suffix in _IMAGE_SUFFIXES:
+        return "IMAGE"
+    raise DocumentPipelineError(
+        "Unsupported source format. Provide source_format_override for sidecar-backed local fixtures."
+    )
+
+
 def _docx_text_runs(document_xml: bytes) -> List[str]:
     root = ET.fromstring(document_xml)
     paragraphs: List[str] = []
@@ -262,12 +290,19 @@ def build_document_pipeline_bundle(
     *,
     sidecar_path: Path | None = None,
     source_uri_or_snapshot: str | None = None,
+    source_format_override: str | None = None,
 ) -> DocumentPipelineBundle:
     source_path = Path(source_path)
-    suffix = source_path.suffix.lower()
-    if suffix not in {".pdf", ".docx"}:
-        raise DocumentPipelineError("Only bootstrap PDF and DOCX sources are supported in the P1 pipeline.")
-    source_format = suffix.lstrip(".").upper()
+    sidecar_payload: Mapping[str, Any] | None = None
+    if sidecar_path is not None:
+        sidecar_payload = json.loads(Path(sidecar_path).read_text(encoding="utf-8-sig"))
+        if not isinstance(sidecar_payload, Mapping):
+            raise DocumentPipelineError("Document sidecar payload must be a JSON object.")
+    source_format = _normalize_source_format(
+        source_path,
+        source_format_override=source_format_override,
+        sidecar_payload=sidecar_payload,
+    )
     source = validate_math_document_source(
         {
             "schema": "math_document_source/v1",
@@ -280,14 +315,13 @@ def build_document_pipeline_bundle(
             "parser_eligibility": "eligible",
         }
     )
-    if source_format == "PDF":
-        if sidecar_path is None:
-            raise DocumentPipelineError("Bootstrap PDF ingestion requires a checked-in extraction sidecar.")
-        sidecar_payload = json.loads(Path(sidecar_path).read_text(encoding="utf-8-sig"))
-        if not isinstance(sidecar_payload, Mapping):
-            raise DocumentPipelineError("PDF sidecar payload must be a JSON object.")
-        record = _build_pdf_record(source, sidecar_payload)
-    else:
+    if source_format == "DOCX":
         record = _build_docx_record(source, source_path)
+    else:
+        if sidecar_payload is None:
+            raise DocumentPipelineError(
+                "Bootstrap PDF/image/scanned_note/diagram ingestion requires a checked-in extraction sidecar."
+            )
+        record = _build_pdf_record(source, sidecar_payload)
     projection = _build_projection(record)
     return DocumentPipelineBundle(source=source, record=record, projection=projection)

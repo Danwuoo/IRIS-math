@@ -51,10 +51,16 @@ def test_profile_bundle_registry_loads_p2_and_p3() -> None:
 def test_p1_phase_specific_bundle_allows_zero_tier1_cap_in_phase_a() -> None:
     phase_a = load_policy_bundle_for_profile_phase("P1", "A")
     phase_c = load_policy_bundle_for_profile_phase("P1", "C")
+    phase_d = load_policy_bundle_for_profile_phase("P1", "D")
+    phase_e = load_policy_bundle_for_profile_phase("P1", "E")
 
     assert phase_a.data_realization_policy.data_realization_policy_id == "p1-bootstrap-a-v1"
     assert phase_a.data_realization_policy.tier1_global_cap == {"token_cap": 0.0, "record_cap": 0.0}
     assert phase_c.data_realization_policy.data_realization_policy_id == "p1-bootstrap-c-v1"
+    assert phase_d.data_realization_policy.data_realization_policy_id == "p1-bootstrap-d-v1"
+    assert phase_e.data_realization_policy.data_realization_policy_id == "p1-bootstrap-e-v1"
+    assert phase_d.data_realization_policy.tier1_global_cap == {"token_cap": 5.0, "record_cap": 5.0}
+    assert phase_e.data_realization_policy.tier1_global_cap == {"token_cap": 5.0, "record_cap": 5.0}
 
 
 def test_document_slice_id_is_stable_and_tracks_provenance_changes() -> None:

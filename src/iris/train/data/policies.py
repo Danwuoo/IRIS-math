@@ -545,7 +545,7 @@ def load_default_policy_bundle() -> DataPolicyBundle:
 
 def _derive_p1_phase_bundle(base_bundle: DataPolicyBundle, phase: str) -> DataPolicyBundle:
     normalized_phase = str(phase).strip().upper()
-    if normalized_phase not in {"A", "B", "C"}:
+    if normalized_phase not in {"A", "B", "C", "D", "E"}:
         raise PolicyValidationError(f"P1 phase bundle is not registered for phase={phase!r}.")
     if normalized_phase == "B":
         return base_bundle
@@ -553,6 +553,8 @@ def _derive_p1_phase_bundle(base_bundle: DataPolicyBundle, phase: str) -> DataPo
         "A": "p1-bootstrap-a-v1",
         "B": "p1-bootstrap-b-v2",
         "C": "p1-bootstrap-c-v1",
+        "D": "p1-bootstrap-d-v1",
+        "E": "p1-bootstrap-e-v1",
     }
     tier1_cap = {"token_cap": 0.0, "record_cap": 0.0} if normalized_phase == "A" else dict(
         base_bundle.data_realization_policy.tier1_global_cap

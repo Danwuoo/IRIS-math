@@ -92,14 +92,28 @@ def main() -> int:
         help="Directory where gate artifacts and markdown report are written.",
     )
     parser.add_argument(
+        "--document-fixtures",
+        type=Path,
+        default=Path("tests/fixtures/p1_phase_de/document_eval"),
+        help="Math-native document eval fixture root.",
+    )
+    parser.add_argument(
+        "--proof-fixtures",
+        type=Path,
+        default=Path("tests/fixtures/p1_phase_de/proof_eval"),
+        help="Math-native proof eval fixture root.",
+    )
+    parser.add_argument(
         "--conceptarc-corpus",
         type=Path,
-        default=Path("tools/ConceptARC/corpus"),
+        default=None,
+        help="Optional ConceptARC compatibility appendix path.",
     )
     parser.add_argument(
         "--rearc-tasks",
         type=Path,
-        default=Path("data/arc/re_arc/tasks"),
+        default=None,
+        help="Optional re_arc compatibility appendix path.",
     )
     parser.add_argument(
         "--pairing-policy",
@@ -141,7 +155,7 @@ def main() -> int:
         phase="D",
         baseline_id=args.baseline_id,
         tolerance_profile_id=args.tolerance_profile_id,
-        change_class="Capability expansion (Phase D model-driven ARC diagnostics)",
+        change_class="Capability expansion (Phase D math-native document-grounded diagnostics)",
     )
     tolerances = Tolerances(
         metric_epsilon=args.metric_epsilon,
@@ -249,6 +263,8 @@ def main() -> int:
         seed=args.seed,
         pairing_policy=args.pairing_policy,
         freeze_baseline=args.freeze_baseline,
+        document_fixture_root=args.document_fixtures,
+        proof_fixture_root=args.proof_fixtures,
     )
 
     summary = dict(result.get("summary_report", {}))
