@@ -400,8 +400,20 @@ def run_phase_d_gate(
         "benchmark_family_policy_refs": list(policy_bundle.data_realization_policy.benchmark_family_policy_refs),
         "document_fixture_count": len(document_fixtures),
         "proof_fixture_count": len(proof_fixtures),
+        "aggregate": {
+            "provenance.parser_coverage": _safe_float(
+                dict(document_packet.get("aggregate", {})).get("provenance.parser_coverage.mean"),
+                0.0,
+            ),
+            "provenance.verifier_coverage": _safe_float(
+                dict(proof_packet.get("aggregate", {})).get("provenance.verifier_coverage.mean"),
+                0.0,
+            ),
+            "contam.strict_holdout_leakage_score": None,
+        },
         "heldout_posture": "Tier 2/3 remain eval-only; no new train-visible benchmark exposure introduced.",
         "frontiermath_posture": "original FrontierMath remains untouched; local held-out fixtures are synthetic or fixture-backed only.",
+        "strict_holdout_leakage_source": "unavailable_fixture_posture_only",
         "provenance_guardrails": [SIDECAR_TECH_DEBT_NOTE],
     }
     notes = [

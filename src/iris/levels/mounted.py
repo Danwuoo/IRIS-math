@@ -743,6 +743,7 @@ def _l6_run(level_input: LevelInput) -> LevelOutput:
             "task_family_resolution_source": semantics.task_family_resolution_source,
             "task_adjudication_policy_id": semantics.task_adjudication_policy_id,
             "task_adjudication_policy_resolution_source": semantics.task_adjudication_policy_resolution_source,
+            "benchmark_family_override_ref": semantics.benchmark_family_override_ref,
             "runtime_status": state_out.CS.runtime_status,
             "adjudication_status": state_out.CS.adjudication_state.adjudication_status,
         }

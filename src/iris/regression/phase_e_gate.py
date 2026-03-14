@@ -12,6 +12,7 @@ from .math_native_phase_eval import (
     document_eval_packet,
     evaluate_document_fixture,
     evaluate_proof_fixture,
+    proof_eval_packet,
     read_json,
     write_json,
 )
@@ -72,10 +73,11 @@ def _heldout_packet(
             context=context,
             eval_partition="strict_holdout",
         ),
-        "proof_packet": {
-            "fixtures": list(proof_results),
-            "fixture_count": len(proof_results),
-        },
+        "proof_packet": proof_eval_packet(
+            proof_results=proof_results,
+            context=context,
+            eval_partition="strict_holdout",
+        ),
         "failures": failures,
     }
 

@@ -182,6 +182,7 @@ def evaluate_document_fixture(
     current_slot_targets = tuple(str(item) for item in document_bundle.projection.state_ir_slot_targets)
     parse_completeness = float(l0.get("rep.document.parse_completeness", 0.0))
     grounding_score = float(l6.get("task.document_grounding_score", l0.get("task.document_grounding_score", 0.0)))
+    parser_coverage = float(l0.get("provenance.parser_coverage", 0.0))
     anchor_count = len(tuple(document_bundle.projection.anchor_refs))
     runtime_status = str(l6.get("runtime_status", current_state.CS.runtime_status))
     adjudication_state = current_state.CS.adjudication_state
@@ -230,6 +231,9 @@ def evaluate_document_fixture(
         "expected_slot_targets": list(fixture.expected_slot_targets),
         "current_slot_targets": list(current_slot_targets),
         "anchor_count": anchor_count,
+        "parser_provenance_id": document_bundle.record.parser_provenance_id,
+        "parser_provenance_refs": dict(document_bundle.record.parser_provenance_refs),
+        "provenance.parser_coverage": parser_coverage,
         "rep.document.parse_completeness": parse_completeness,
         "task.document_grounding_score": grounding_score,
         "proof.evidence_coverage": 1.0 if len(tuple(current_state.VS)) > 0 else 0.0,
@@ -238,7 +242,14 @@ def evaluate_document_fixture(
         "runtime_status": runtime_status,
         "adjudication_status": adjudication_status,
         "task_family": str(l6.get("task_family", "")),
+        "task_family_resolution_source": str(l6.get("task_family_resolution_source", "")),
         "task_adjudication_policy_id": str(l6.get("task_adjudication_policy_id", "")),
+        "task_adjudication_policy_resolution_source": str(
+            l6.get("task_adjudication_policy_resolution_source", "")
+        ),
+        "benchmark_family_override_ref": (
+            str(l6.get("benchmark_family_override_ref", "")).strip() or None
+        ),
         "status": "PASS" if not reasons else "FAIL",
         "failure_reasons": reasons,
         "technical_debt": (
@@ -274,6 +285,33 @@ def proof_evidence_coverage(required: Sequence[str], emitted: Sequence[str]) -> 
         return 1.0
     emitted_set = {str(item).strip() for item in emitted if str(item).strip()}
     return float(len(required_set & emitted_set)) / float(len(required_set))
+
+
+def _mean_truthy_fraction(items: Sequence[Mapping[str, Any]], field_name: str) -> float:
+    if not items:
+        return 0.0
+    truthy = 0
+    for item in items:
+        value = item.get(field_name)
+        if isinstance(value, (int, float)):
+            if float(value) > 0.0:
+                truthy += 1
+            continue
+        if str(value or "").strip():
+            truthy += 1
+    return float(truthy) / float(len(items))
+
+
+def _value_counts(items: Sequence[Mapping[str, Any]], field_name: str) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for item in items:
+        key = str(item.get(field_name, "")).strip() or "missing"
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _count_truthy(items: Sequence[Mapping[str, Any]], field_name: str) -> int:
+    return sum(1 for item in items if item.get(field_name))
 
 
 def evaluate_proof_fixture(
@@ -321,8 +359,11 @@ def evaluate_proof_fixture(
     false_accept_rate = float(l6.get("eval.false_accept_rate", 1.0))
     calibration_error = float(l6.get("eval.calibration_error", 1.0))
     verifier_coverage = float(l6.get("provenance.verifier_coverage", 0.0))
+    formalizer_coverage = float(l6.get("provenance.formalizer_coverage", 0.0))
     verifier_head = dict(dict(l6.get("internal_heads", {})).get("verifier_aggregator", {}))
     formal_bridge_status = str(verifier_head.get("formal_bridge_status", "")).strip() or None
+    verifier_manifest = dict(getattr(policy_bundle, "provenance_manifests", {})).get("verifier-stack-v1")
+    formalizer_manifest = dict(getattr(policy_bundle, "provenance_manifests", {})).get("formalizer-skeleton-v1")
     if task_family != fixture.task_family:
         reasons.append(f"task_family mismatch: expected {fixture.task_family!r}, got {task_family!r}")
     if policy_id != fixture.expected_task_adjudication_policy_id:
@@ -376,16 +417,30 @@ def evaluate_proof_fixture(
         "required_evidence_classes": list(fixture.required_evidence_classes),
         "emitted_evidence_classes": list(emitted),
         "proof.evidence_coverage": evidence_coverage,
+        "verifier_provenance_id": (
+            str(getattr(verifier_manifest, "manifest_id", "")).strip() or None
+        ),
+        "formalizer_provenance_id": (
+            str(getattr(formalizer_manifest, "manifest_id", "")).strip() or None
+        ),
         "rep.document.parse_completeness": float(diagnostics["L0"].get("rep.document.parse_completeness", 0.0)),
         "task.document_grounding_score": float(l6.get("task.document_grounding_score", 0.0)),
         "task.validity_score": validity_score,
         "eval.false_accept_rate": false_accept_rate,
         "eval.calibration_error": calibration_error,
         "provenance.verifier_coverage": verifier_coverage,
+        "provenance.formalizer_coverage": formalizer_coverage,
         "concept.isolation_score": evidence_coverage,
         "concept.leakage_score": max(0.0, 1.0 - evidence_coverage),
         "runtime_status": runtime_status,
         "adjudication_status": adjudication_status,
+        "task_family_resolution_source": str(l6.get("task_family_resolution_source", "")),
+        "task_adjudication_policy_resolution_source": str(
+            l6.get("task_adjudication_policy_resolution_source", "")
+        ),
+        "benchmark_family_override_ref": (
+            str(l6.get("benchmark_family_override_ref", "")).strip() or None
+        ),
         "formal_bridge_status": formal_bridge_status,
         "status": "PASS" if not reasons else "FAIL",
         "failure_reasons": reasons,
@@ -415,6 +470,25 @@ def document_eval_packet(
         "aggregate": {
             "rep.document.parse_completeness.mean": mean_metric(document_results, "rep.document.parse_completeness"),
             "task.document_grounding_score.mean": mean_metric(document_results, "task.document_grounding_score"),
+            "provenance.parser_coverage.mean": mean_metric(document_results, "provenance.parser_coverage"),
+        },
+        "coverage_summary": {
+            "task_family_resolution_coverage": _mean_truthy_fraction(
+                document_results, "task_family_resolution_source"
+            ),
+            "task_adjudication_policy_resolution_coverage": _mean_truthy_fraction(
+                document_results, "task_adjudication_policy_resolution_source"
+            ),
+            "runtime_status_counts": _value_counts(document_results, "runtime_status"),
+            "adjudication_status_counts": _value_counts(document_results, "adjudication_status"),
+            "task_family_resolution_source_counts": _value_counts(
+                document_results, "task_family_resolution_source"
+            ),
+            "task_adjudication_policy_resolution_source_counts": _value_counts(
+                document_results, "task_adjudication_policy_resolution_source"
+            ),
+            "sidecar_fixture_count": _count_truthy(document_results, "sidecar_path"),
+            "technical_debt_fixture_count": _count_truthy(document_results, "technical_debt"),
         },
         "fixtures": list(document_results),
     }
@@ -441,6 +515,29 @@ def proof_eval_packet(
             "task.validity_score.mean": mean_metric(proof_results, "task.validity_score"),
             "eval.false_accept_rate.mean": mean_metric(proof_results, "eval.false_accept_rate"),
             "eval.calibration_error.mean": mean_metric(proof_results, "eval.calibration_error"),
+            "provenance.verifier_coverage.mean": mean_metric(
+                proof_results, "provenance.verifier_coverage"
+            ),
+            "provenance.formalizer_coverage.mean": mean_metric(
+                proof_results, "provenance.formalizer_coverage"
+            ),
+        },
+        "coverage_summary": {
+            "task_family_resolution_coverage": _mean_truthy_fraction(
+                proof_results, "task_family_resolution_source"
+            ),
+            "task_adjudication_policy_resolution_coverage": _mean_truthy_fraction(
+                proof_results, "task_adjudication_policy_resolution_source"
+            ),
+            "runtime_status_counts": _value_counts(proof_results, "runtime_status"),
+            "adjudication_status_counts": _value_counts(proof_results, "adjudication_status"),
+            "task_family_resolution_source_counts": _value_counts(
+                proof_results, "task_family_resolution_source"
+            ),
+            "task_adjudication_policy_resolution_source_counts": _value_counts(
+                proof_results, "task_adjudication_policy_resolution_source"
+            ),
+            "formal_bridge_status_counts": _value_counts(proof_results, "formal_bridge_status"),
         },
         "fixtures": list(proof_results),
     }
