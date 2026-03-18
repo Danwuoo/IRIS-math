@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from concurrent.futures import Future, ThreadPoolExecutor
 import json
 import math
 import random
+import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
 import numpy as np
 
@@ -18,6 +20,7 @@ from .state_builder import text_to_state_ir
 from .token_accounting import (
     TokenizerHandle,
     count_tokens,
+    load_tokenizer_runtime,
     truncate_text_to_tokens,
 )
 
@@ -229,6 +232,7 @@ class P1StreamingProvider:
         self.max_offset_records = int(max(max_offset_records, 1))
         self.max_records_scan = int(max(max_records_scan, 64))
         self.max_source_read_retries = int(max(max_source_read_retries, 0))
+        self._thread_local = threading.local()
 
         self._source_by_id = {source.source_id: source for source in self.manifest.sources}
         self._effective_mode_by_source: Dict[str, str] = {}
@@ -397,12 +401,13 @@ class P1StreamingProvider:
         self,
         *,
         source: P1StreamingSource,
+        tokenizer: Any,
         sample_key: str,
         target_tokens: int,
     ) -> str:
         digest = sample_key[:16]
         fragments: List[str] = []
-        while count_tokens(self.tokenizer_handle.tokenizer, "\n".join(fragments) or "seed") < int(target_tokens):
+        while count_tokens(tokenizer, "\n".join(fragments) or "seed") < int(target_tokens):
             index = len(fragments)
             fragments.append(
                 (
@@ -412,18 +417,38 @@ class P1StreamingProvider:
                 )
             )
         merged = "\n".join(fragments)
-        return truncate_text_to_tokens(self.tokenizer_handle.tokenizer, merged, int(target_tokens))
+        return truncate_text_to_tokens(tokenizer, merged, int(target_tokens))
+
+    def _tokenizer_for_current_thread(self) -> Any:
+        if threading.current_thread() is threading.main_thread():
+            return self.tokenizer_handle.tokenizer
+        cached = getattr(self._thread_local, "tokenizer", None)
+        if cached is not None:
+            return cached
+        tokenizer_path = Path(str(self.tokenizer_handle.id_or_path))
+        if tokenizer_path.exists():
+            cached = load_tokenizer_runtime(str(tokenizer_path))
+        else:
+            cached = self.tokenizer_handle.tokenizer
+        self._thread_local.tokenizer = cached
+        return cached
 
     def _sample_text_record(
         self,
         *,
         source: P1StreamingSource,
         opened: Any,
+        tokenizer: Any,
         sample_key: str,
         target_tokens: int,
     ) -> Tuple[str, int, str]:
         if source.source_kind == "synthetic":
-            text = self._synthetic_text(source=source, sample_key=sample_key, target_tokens=target_tokens)
+            text = self._synthetic_text(
+                source=source,
+                tokenizer=tokenizer,
+                sample_key=sample_key,
+                target_tokens=target_tokens,
+            )
             return text, 1, "synthetic"
 
         dataset_spec = _coerce_dataset_spec(source)
@@ -490,8 +515,8 @@ class P1StreamingProvider:
                 if not clean_text:
                     rejection_counts["clean_text_rejected"] += 1
                     continue
-                clipped = truncate_text_to_tokens(self.tokenizer_handle.tokenizer, clean_text, remaining_tokens)
-                token_count = count_tokens(self.tokenizer_handle.tokenizer, clipped)
+                clipped = truncate_text_to_tokens(tokenizer, clean_text, remaining_tokens)
+                token_count = count_tokens(tokenizer, clipped)
                 if token_count <= 0:
                     rejection_counts["tokenizer_empty"] += 1
                     continue
@@ -502,7 +527,7 @@ class P1StreamingProvider:
 
             if texts:
                 merged = truncate_text_to_tokens(
-                    self.tokenizer_handle.tokenizer,
+                    tokenizer,
                     "\n\n".join(texts),
                     int(target_tokens),
                 )
@@ -527,7 +552,7 @@ class P1StreamingProvider:
         batch_plan: P1BatchPlan,
     ) -> P1Batch:
         source, opened = self._open_source_iterable(batch_plan.source_id)
-        tokenizer = self.tokenizer_handle.tokenizer
+        tokenizer = self._tokenizer_for_current_thread()
         pad_token_id = int(getattr(tokenizer, "pad_token_id", 0) or 0)
         input_rows: List[np.ndarray] = []
         label_rows: List[np.ndarray] = []
@@ -551,6 +576,7 @@ class P1StreamingProvider:
             text, records_used, effective_mode = self._sample_text_record(
                 source=source,
                 opened=opened,
+                tokenizer=tokenizer,
                 sample_key=sample_key,
                 target_tokens=batch_plan.target_tokens,
             )
@@ -621,3 +647,47 @@ class P1StreamingProvider:
             state_irs=tuple(states),
             metadata=tuple(metadata_rows),
         )
+
+    def iter_prefetched_batches(
+        self,
+        *,
+        segment_id: int,
+        dataset_slice_id: str,
+        batch_plans: Sequence[P1BatchPlan],
+        max_workers: int,
+        prefetch_batches: int,
+    ) -> Iterable[P1Batch]:
+        plans = tuple(batch_plans)
+        worker_count = max(1, min(int(max_workers), len(plans))) if plans else 1
+        queue_depth = max(worker_count, min(int(prefetch_batches), len(plans))) if plans else 1
+        if worker_count <= 1 or queue_depth <= 1 or len(plans) <= 1:
+            for batch_plan in plans:
+                yield self.sample_batch(
+                    segment_id=segment_id,
+                    dataset_slice_id=dataset_slice_id,
+                    batch_plan=batch_plan,
+                )
+            return
+
+        def _submit(executor: ThreadPoolExecutor, batch_index: int) -> Future[P1Batch]:
+            return executor.submit(
+                self.sample_batch,
+                segment_id=segment_id,
+                dataset_slice_id=dataset_slice_id,
+                batch_plan=plans[batch_index],
+            )
+
+        with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="iris-p1-batch") as executor:
+            in_flight: Dict[int, Future[P1Batch]] = {}
+            next_submit = 0
+            next_yield = 0
+            while next_submit < min(queue_depth, len(plans)):
+                in_flight[next_submit] = _submit(executor, next_submit)
+                next_submit += 1
+            while next_yield < len(plans):
+                batch = in_flight.pop(next_yield).result()
+                while next_submit < len(plans) and len(in_flight) < queue_depth:
+                    in_flight[next_submit] = _submit(executor, next_submit)
+                    next_submit += 1
+                yield batch
+                next_yield += 1

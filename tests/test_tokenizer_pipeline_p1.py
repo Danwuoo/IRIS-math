@@ -53,6 +53,34 @@ def test_tokenizer_corpus_generation_is_deterministic_for_synthetic_manifest(tmp
     assert path_a.read_text(encoding="utf-8") == path_b.read_text(encoding="utf-8")
 
 
+def test_tokenizer_corpus_generation_matches_serial_output_when_parallelized(tmp_path: Path) -> None:
+    manifest = _synthetic_manifest()
+    build_config = TokenizerBuildConfig(
+        sample_records_per_source=8,
+        max_corpus_chars=4_000,
+        seed=31,
+    )
+
+    serial_path = write_tokenizer_corpus(
+        manifest,
+        output_dir=tmp_path / "serial",
+        streaming_mode="auto",
+        snapshot_root=None,
+        build_config=build_config,
+        corpus_workers=1,
+    )
+    parallel_path = write_tokenizer_corpus(
+        manifest,
+        output_dir=tmp_path / "parallel",
+        streaming_mode="auto",
+        snapshot_root=None,
+        build_config=build_config,
+        corpus_workers=4,
+    )
+
+    assert serial_path.read_text(encoding="utf-8") == parallel_path.read_text(encoding="utf-8")
+
+
 def test_sentencepiece_training_produces_reloadable_tokenizer_dir(tmp_path: Path) -> None:
     pytest.importorskip("sentencepiece")
     pytest.importorskip("transformers")
@@ -70,6 +98,8 @@ def test_sentencepiece_training_produces_reloadable_tokenizer_dir(tmp_path: Path
             max_corpus_chars=4_000,
             seed=19,
         ),
+        corpus_workers=2,
+        sentencepiece_threads=2,
     )
 
     handle = load_tokenizer_handle(str(artifact.tokenizer_dir))

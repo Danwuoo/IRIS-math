@@ -177,6 +177,19 @@ def _global_contamination_filter(text: str) -> bool:
     return True
 
 
+def _source_value_matches(actual_source: str, required_source: str) -> bool:
+    normalized_actual = str(actual_source).strip().lower()
+    normalized_required = str(required_source).strip().lower()
+    if not normalized_required:
+        return True
+    if not normalized_actual:
+        return False
+    if normalized_actual == normalized_required:
+        return True
+    actual_prefix = normalized_actual.split("/", 1)[0].strip()
+    return actual_prefix == normalized_required
+
+
 def _is_source_allowed(source: DatasetSourceSpec, record: Mapping[str, Any], text: str) -> bool:
     source_id = source.source_id
     metadata = source.metadata
@@ -186,13 +199,14 @@ def _is_source_allowed(source: DatasetSourceSpec, record: Mapping[str, Any], tex
         actual_source = str(
             record.get("source", record.get("dataset_source", ""))
         ).strip().lower()
-        if actual_source and actual_source != required_source:
+        if actual_source and not _source_value_matches(actual_source, required_source):
             return False
 
     if source_id == "pes2o_s2orc":
-        return str(record.get("source", "")).strip().lower() == str(
-            metadata.get("required_source", "s2orc")
-        ).lower()
+        return _source_value_matches(
+            str(record.get("source", "")).strip().lower(),
+            str(metadata.get("required_source", "s2orc")).lower(),
+        )
 
     if source_id == "the_stack_code":
         allow_languages = {

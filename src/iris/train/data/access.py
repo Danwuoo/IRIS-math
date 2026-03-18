@@ -217,6 +217,12 @@ def _open_hf_stream(
     *,
     loader: LoadDatasetFn,
 ) -> Iterable[Mapping[str, Any]]:
+    if bool(source.metadata.get("hf_force_file_fallback", False)):
+        # TEMPORARY TECHNICAL DEBT: force file-based routing for sources such as peS2o
+        # whose repo-level iterator order mixes or front-loads disallowed source families.
+        # Remove once manifest-resolved source-family partitioning can select compliant
+        # document slices directly without relying on shard-order heuristics.
+        return _open_hf_file_fallback(source, loader=loader)
     kwargs: Dict[str, Any] = {
         "split": source.split,
         "streaming": True,

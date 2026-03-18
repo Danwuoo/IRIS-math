@@ -120,7 +120,7 @@ def tokenizer_fingerprint(tokenizer: Any, id_or_path: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def load_tokenizer_handle(id_or_path: str) -> TokenizerHandle:
+def load_tokenizer_runtime(id_or_path: str) -> Any:
     if not str(id_or_path).strip():
         raise TokenizerError("tokenizer-id-or-path is required.")
     normalized_path = str(id_or_path).strip()
@@ -130,6 +130,12 @@ def load_tokenizer_handle(id_or_path: str) -> TokenizerHandle:
         fallback = _maybe_load_sentencepiece_adapter(normalized_path)
         if fallback is not None:
             tokenizer = fallback
+    return tokenizer
+
+
+def load_tokenizer_handle(id_or_path: str) -> TokenizerHandle:
+    normalized_path = str(id_or_path).strip()
+    tokenizer = load_tokenizer_runtime(normalized_path)
     fingerprint = tokenizer_fingerprint(tokenizer, str(id_or_path).strip())
     return TokenizerHandle(
         id_or_path=str(id_or_path).strip(),

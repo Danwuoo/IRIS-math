@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -112,6 +113,47 @@ def iter_manifest_texts(
             yield text
 
 
+def _collect_source_texts(
+    source: P1StreamingSource,
+    *,
+    streaming_mode: str,
+    snapshot_root: Path | None,
+    sample_records_per_source: int,
+    seed: int,
+) -> tuple[str, ...]:
+    if source.source_kind == "synthetic":
+        return tuple(
+            _synthetic_tokenizer_lines(
+                source,
+                max_records=sample_records_per_source,
+                seed=seed,
+            )
+        )
+
+    dataset_spec = _coerce_dataset_spec(source)
+    opened = open_streaming_source(
+        dataset_spec,
+        streaming_mode=streaming_mode,
+        snapshot_root=snapshot_root,
+    )
+    iterator = iter(opened.iterable)
+    rows = []
+    yielded = 0
+    while yielded < int(sample_records_per_source):
+        try:
+            record = next(iterator)
+        except StopIteration:
+            break
+        if not isinstance(record, Mapping):
+            continue
+        text = prepare_clean_text(dataset_spec, record)
+        if not text:
+            continue
+        yielded += 1
+        rows.append(text)
+    return tuple(rows)
+
+
 def write_tokenizer_corpus(
     manifest: P1StreamingManifest,
     *,
@@ -119,25 +161,51 @@ def write_tokenizer_corpus(
     streaming_mode: str,
     snapshot_root: Path | None,
     build_config: TokenizerBuildConfig,
+    corpus_workers: int = 1,
 ) -> Path:
     corpus_path = Path(output_dir) / "tokenizer_corpus.txt"
     corpus_path.parent.mkdir(parents=True, exist_ok=True)
+    sources = tuple(manifest.sources)
+    source_rows: Dict[str, tuple[str, ...]] = {}
+    worker_count = max(1, min(int(corpus_workers), len(sources))) if sources else 1
+    if worker_count <= 1:
+        for source in sources:
+            source_rows[source.source_id] = _collect_source_texts(
+                source,
+                streaming_mode=streaming_mode,
+                snapshot_root=snapshot_root,
+                sample_records_per_source=build_config.sample_records_per_source,
+                seed=build_config.seed,
+            )
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="iris-tok-corpus") as executor:
+            futures = {
+                source.source_id: executor.submit(
+                    _collect_source_texts,
+                    source,
+                    streaming_mode=streaming_mode,
+                    snapshot_root=snapshot_root,
+                    sample_records_per_source=build_config.sample_records_per_source,
+                    seed=build_config.seed,
+                )
+                for source in sources
+            }
+            for source in sources:
+                source_rows[source.source_id] = futures[source.source_id].result()
+
     written_chars = 0
     with corpus_path.open("w", encoding="utf-8") as handle:
-        for text in iter_manifest_texts(
-            manifest,
-            streaming_mode=streaming_mode,
-            snapshot_root=snapshot_root,
-            sample_records_per_source=build_config.sample_records_per_source,
-            seed=build_config.seed,
-        ):
+        for source in sources:
+            for text in source_rows.get(source.source_id, ()):
+                if written_chars >= int(build_config.max_corpus_chars):
+                    break
+                clipped = text[: max(int(build_config.max_corpus_chars) - written_chars, 0)]
+                if not clipped:
+                    break
+                handle.write(clipped.replace("\r\n", "\n").replace("\r", "\n") + "\n")
+                written_chars += len(clipped)
             if written_chars >= int(build_config.max_corpus_chars):
                 break
-            clipped = text[: max(int(build_config.max_corpus_chars) - written_chars, 0)]
-            if not clipped:
-                break
-            handle.write(clipped.replace("\r\n", "\n").replace("\r", "\n") + "\n")
-            written_chars += len(clipped)
     if written_chars <= 0:
         raise TokenizerBuildError("Tokenizer corpus generation produced no usable text.")
     return corpus_path
@@ -196,6 +264,8 @@ def train_sentencepiece_tokenizer(
     streaming_mode: str,
     snapshot_root: Path | None,
     build_config: TokenizerBuildConfig,
+    corpus_workers: int = 1,
+    sentencepiece_threads: int = 1,
 ) -> TokenizerArtifact:
     try:
         import sentencepiece as spm
@@ -226,6 +296,7 @@ def train_sentencepiece_tokenizer(
         streaming_mode=streaming_mode,
         snapshot_root=snapshot_root,
         build_config=build_config,
+        corpus_workers=corpus_workers,
     )
     model_prefix = tokenizer_dir / "sentencepiece"
     spm.SentencePieceTrainer.train(
@@ -241,6 +312,7 @@ def train_sentencepiece_tokenizer(
         unk_id=1,
         bos_id=2,
         eos_id=3,
+        num_threads=max(int(sentencepiece_threads), 1),
     )
     _maybe_write_hf_tokenizer_wrapper(tokenizer_dir, model_prefix.with_suffix(".model"))
     payload = build_tokenizer_manifest_payload(

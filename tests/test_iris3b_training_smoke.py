@@ -45,7 +45,7 @@ def test_p1_training_cycle_writes_governed_checkpoint_and_metrics(tmp_path: Path
     model_config = replace(
         small_test_config(),
         segment_steps=1,
-        gradient_accumulation_steps=1,
+        gradient_accumulation_steps=2,
         micro_batch_size=1,
         warmup_steps=1,
     ).validate()

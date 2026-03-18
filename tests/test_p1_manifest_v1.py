@@ -26,7 +26,9 @@ def test_default_p1_manifest_resolves_to_committed_sha_locked_variant() -> None:
     assert tuple(prooflang.metadata.get("hf_snapshot_archives", [])) == ("proofs.zip",)
 
     assert pes2o.hf_name == "v2"
+    assert pes2o.metadata.get("hf_force_file_fallback") is True
     assert pes2o.metadata.get("hf_file_fallback_builder") == "json"
+    assert pes2o.metadata["hf_repo_files_by_split"]["train"][0] == "data/v2/train-00010-of-00020.json.gz"
     assert pes2o.metadata.get("qa_gate_profile") == "document_relaxed"
     assert pes2o.metadata["document_ingestion"]["mode"] == "paragraph_window"
     assert pes2o.metadata["hf_repo_file_patterns_by_split"]["train"] == ["data/v2/train-*.json.gz"]

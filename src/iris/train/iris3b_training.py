@@ -4,6 +4,7 @@ import json
 import shutil
 import time
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Mapping
 
@@ -88,9 +89,18 @@ def _should_crash(config: "P1TrainConfig", point: str, segment_id: int) -> bool:
 
 def _enforce_cache_budget(config: "P1TrainConfig") -> Dict[str, object]:
     budget_gib = int(max(config.dataset_cache_limit_gib, 0))
+    free_space_floor_gib = int(max(config.cache_free_space_floor_gib, 0))
     return enforce_dataset_cache_budget(
         roots=(config.cache_root, config.snapshot_root),
         budget_bytes=gib_to_bytes(budget_gib),
+        min_free_bytes=gib_to_bytes(free_space_floor_gib),
+        monitor_roots=(
+            config.output_dir,
+            config.tokenizer_dir,
+            config.tokenizer_workdir,
+            config.cache_root,
+            config.snapshot_root,
+        ),
     )
 
 
@@ -174,6 +184,8 @@ def _prepare_tokenizer(
         output_dir=workdir,
         streaming_mode=config.streaming_mode,
         snapshot_root=config.snapshot_root,
+        corpus_workers=config.tokenizer_corpus_workers,
+        sentencepiece_threads=config.sentencepiece_threads,
         build_config=TokenizerBuildConfig(
             vocab_size=config.model_config.vocab_size,
             sample_records_per_source=config.tokenizer_sample_records_per_source,
@@ -205,9 +217,10 @@ def _optimizer_for_config(optax: Any, config: IRIS3BConfig) -> Any:
     )
 
 
-def _train_functions(model_config: IRIS3BConfig, optimizer: Any) -> tuple[Any, Any]:
+def _train_functions(model_config: IRIS3BConfig, optimizer: Any) -> tuple[Any, Any, Any]:
     jax, jnp, optax, model_cls = _require_train_stack()
     model = model_cls(model_config.validate())
+    grad_accum_scale = 1.0 / float(max(int(model_config.gradient_accumulation_steps), 1))
 
     def loss_fn(params: Any, batch: Mapping[str, Any]) -> tuple[Any, Dict[str, Any]]:
         outputs = model.apply(
@@ -233,13 +246,20 @@ def _train_functions(model_config: IRIS3BConfig, optimizer: Any) -> tuple[Any, A
 
     grad_fn = jax.jit(jax.value_and_grad(loss_fn, has_aux=True))
 
-    @jax.jit
-    def apply_grads(params: Any, opt_state: Any, grads: Any) -> tuple[Any, Any]:
+    # Reuse the previous accumulation buffer so the 50k x 2560 embedding grad
+    # does not require a third full fp32 allocation at each micro-step.
+    @partial(jax.jit, donate_argnums=(0,))
+    def accumulate_grads(grad_accum: Any, grads: Any) -> Any:
+        return jax.tree_util.tree_map(lambda left, right: left + right, grad_accum, grads)
+
+    @partial(jax.jit, donate_argnums=(0, 1, 2))
+    def apply_grads(params: Any, opt_state: Any, grad_accum: Any) -> tuple[Any, Any]:
+        grads = jax.tree_util.tree_map(lambda value: value * grad_accum_scale, grad_accum)
         updates, next_opt_state = optimizer.update(grads, opt_state, params)
         next_params = optax.apply_updates(params, updates)
         return next_params, next_opt_state
 
-    return grad_fn, apply_grads
+    return grad_fn, accumulate_grads, apply_grads
 
 
 @dataclass
@@ -263,9 +283,14 @@ class P1TrainConfig:
     tokenizer_sample_records_per_source: int = 2_048
     tokenizer_max_corpus_chars: int = 4_000_000
     tokenizer_seed: int = 17
+    host_cpu_threads: int = 1
+    batch_prefetch: int = 1
+    tokenizer_corpus_workers: int = 1
+    sentencepiece_threads: int = 1
     max_cycle_minutes: int = 350
     max_segments: int = 10_000
     dataset_cache_limit_gib: int = 50
+    cache_free_space_floor_gib: int = 0
     hf_token: str | None = None
     runtime_lock_manifest_path: Path | None = None
     crash_point: str = "none"
@@ -294,9 +319,14 @@ class P1TrainConfig:
             "tokenizer_sample_records_per_source": int(self.tokenizer_sample_records_per_source),
             "tokenizer_max_corpus_chars": int(self.tokenizer_max_corpus_chars),
             "tokenizer_seed": int(self.tokenizer_seed),
+            "host_cpu_threads": int(self.host_cpu_threads),
+            "batch_prefetch": int(self.batch_prefetch),
+            "tokenizer_corpus_workers": int(self.tokenizer_corpus_workers),
+            "sentencepiece_threads": int(self.sentencepiece_threads),
             "max_cycle_minutes": int(self.max_cycle_minutes),
             "max_segments": int(self.max_segments),
             "dataset_cache_limit_gib": int(self.dataset_cache_limit_gib),
+            "cache_free_space_floor_gib": int(self.cache_free_space_floor_gib),
             "runtime_lock_manifest_path": (
                 str(self.runtime_lock_manifest_path) if self.runtime_lock_manifest_path is not None else None
             ),
@@ -354,7 +384,7 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
     events = load_journal(journal_path)
     next_segment, last_applied, pending_event = resolve_resume_pointer(events)
     optimizer = _optimizer_for_config(optax, model_config)
-    grad_fn, apply_grads = _train_functions(model_config, optimizer)
+    grad_fn, accumulate_grads, apply_grads = _train_functions(model_config, optimizer)
 
     params = init_iris3b_params(
         model_config,
@@ -379,6 +409,7 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
         opt_state = checkpoint["opt_state"]
         rng_state = dict(checkpoint["rng_state"])
         optimizer_step_id = int(checkpoint.get("optimizer_step_id_last_applied", 0))
+        cache_budget_summary = _enforce_cache_budget(config)
 
     effective_resume_path = config.resume_path_id
     if pending_event is not None and config.resume_path_id == "uninterrupted":
@@ -395,6 +426,7 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
     for segment_id in range(next_segment, next_segment + max(int(config.max_segments), 0)):
         if time.monotonic() >= deadline and segments_completed > 0:
             break
+        cache_budget_summary = _enforce_cache_budget(config)
         segment_plan = provider.build_segment_plan(
             segment_id=segment_id,
             optimizer_steps=model_config.segment_steps,
@@ -438,6 +470,17 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
         segment_level_losses = []
         token_count_total = 0
         source_counts: Dict[str, int] = {}
+        batch_prefetch = max(int(config.batch_prefetch), 1)
+        batch_workers = max(1, min(int(config.host_cpu_threads), batch_prefetch))
+        batch_iterator = iter(
+            provider.iter_prefetched_batches(
+                segment_id=segment_id,
+                dataset_slice_id=segment_plan.dataset_slice_id,
+                batch_plans=segment_plan.steps,
+                max_workers=batch_workers,
+                prefetch_batches=batch_prefetch,
+            )
+        )
 
         for optimizer_step_idx in range(model_config.segment_steps):
             grad_accum = jax.tree_util.tree_map(jnp.zeros_like, params)
@@ -445,14 +488,8 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
             micro_lm_values = []
             micro_aux_values = []
             micro_level_values = []
-            for accum_idx in range(model_config.gradient_accumulation_steps):
-                batch_idx = optimizer_step_idx * model_config.gradient_accumulation_steps + accum_idx
-                batch_plan = segment_plan.steps[batch_idx]
-                batch = provider.sample_batch(
-                    segment_id=segment_id,
-                    dataset_slice_id=segment_plan.dataset_slice_id,
-                    batch_plan=batch_plan,
-                )
+            for _ in range(model_config.gradient_accumulation_steps):
+                batch = next(batch_iterator)
                 last_batch = batch
                 batch_inputs = {
                     "input_ids": jnp.asarray(batch.input_ids, dtype=jnp.int32),
@@ -462,17 +499,13 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
                     "aux_mask": jnp.asarray(batch.aux_mask, dtype=jnp.float32),
                 }
                 (loss_value, aux_values), grads = grad_fn(params, batch_inputs)
-                grad_accum = jax.tree_util.tree_map(lambda left, right: left + right, grad_accum, grads)
+                grad_accum = accumulate_grads(grad_accum, grads)
                 micro_loss_values.append(float(loss_value))
                 micro_lm_values.append(float(aux_values["lm_loss"]))
                 micro_aux_values.append(float(aux_values["aux_loss"]))
                 micro_level_values.append(np.asarray(aux_values["level_loss"], dtype=np.float64))
                 token_count_total += int(batch.token_count)
                 source_counts[batch.source_id] = int(source_counts.get(batch.source_id, 0)) + int(batch.token_count)
-            grad_accum = jax.tree_util.tree_map(
-                lambda value: value / float(model_config.gradient_accumulation_steps),
-                grad_accum,
-            )
             if _should_crash(config, "pre_commit", segment_id):
                 raise RuntimeError(f"Injected crash at pre_commit for segment_id={segment_id}.")
             params, opt_state = apply_grads(params, opt_state, grad_accum)
@@ -544,6 +577,7 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
                 "resume_path_id": effective_resume_path,
             },
         }
+        cache_budget_summary = _enforce_cache_budget(config)
         last_checkpoint_manifest_path = save_iris3b_checkpoint(
             checkpoint_dir=checkpoints_dir,
             segment_id=segment_id,
@@ -743,6 +777,7 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
         "segments_completed": int(segments_completed),
         "realized_tokens": int(realized_tokens),
         "dataset_cache_limit_gib": int(config.dataset_cache_limit_gib),
+        "cache_free_space_floor_gib": int(config.cache_free_space_floor_gib),
         "dataset_cache_budget": cache_budget_summary,
     }
 

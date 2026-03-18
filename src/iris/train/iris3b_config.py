@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Mapping, Tuple
 
 from .governance import stable_hash
@@ -192,6 +192,91 @@ class IRIS3BConfig:
 
 def default_iris3b_config() -> IRIS3BConfig:
     return IRIS3BConfig().validate()
+
+
+def kaggle_safe_iris3b_config(base: IRIS3BConfig | None = None) -> IRIS3BConfig:
+    cfg = (base or default_iris3b_config()).validate()
+    return replace(
+        cfg,
+        config_id="p1-iris3b-kaggle-safe-v1",
+        max_sequence_length=1_024,
+        sequence_pack_tokens=1_025,
+    ).validate()
+
+
+def kaggle_safer_iris3b_config(base: IRIS3BConfig | None = None) -> IRIS3BConfig:
+    cfg = (base or default_iris3b_config()).validate()
+    return replace(
+        cfg,
+        config_id="p1-iris3b-kaggle-safer-v1",
+        max_sequence_length=768,
+        sequence_pack_tokens=769,
+    ).validate()
+
+
+def kaggle_emergency_iris3b_config(base: IRIS3BConfig | None = None) -> IRIS3BConfig:
+    cfg = (base or default_iris3b_config()).validate()
+    return replace(
+        cfg,
+        config_id="p1-iris3b-kaggle-emergency-v1",
+        max_sequence_length=512,
+        sequence_pack_tokens=513,
+        param_dtype="bfloat16",
+    ).validate()
+
+
+def kaggle_survival_iris3b_config(base: IRIS3BConfig | None = None) -> IRIS3BConfig:
+    cfg = (base or default_iris3b_config()).validate()
+    return replace(
+        cfg,
+        config_id="p1-iris3b-kaggle-survival-v1",
+        max_sequence_length=384,
+        sequence_pack_tokens=385,
+        param_dtype="bfloat16",
+    ).validate()
+
+
+def cycle_memory_profile_candidates(
+    *,
+    memory_profile: str = "auto",
+    kaggle_runtime: bool = False,
+) -> Tuple[str, ...]:
+    normalized = str(memory_profile or "auto").strip().lower() or "auto"
+    # TEMPORARY TECHNICAL DEBT: keep auto-selected Kaggle P1 runs from failing
+    # hard on first-step device OOM by walking a bounded shorter-context ladder.
+    # Remove once the governed 3B P1 stack fits the default Kaggle path reliably
+    # without deterministic retry. Intended replacement: a stable single-profile
+    # cycle config selected without runtime fallback on Kaggle-class devices.
+    if normalized == "auto" and kaggle_runtime:
+        return ("kaggle_safe", "kaggle_safer", "kaggle_emergency", "kaggle_survival")
+    return (normalized,)
+
+
+def select_cycle_iris3b_config(
+    *,
+    explicit_config: IRIS3BConfig | None = None,
+    memory_profile: str = "auto",
+    kaggle_runtime: bool = False,
+) -> IRIS3BConfig:
+    base_config = explicit_config.validate() if explicit_config is not None else default_iris3b_config()
+    normalized = str(memory_profile or "auto").strip().lower() or "auto"
+    if normalized == "default":
+        return base_config
+    if normalized == "kaggle_safe":
+        return kaggle_safe_iris3b_config(base_config)
+    if normalized == "kaggle_safer":
+        return kaggle_safer_iris3b_config(base_config)
+    if normalized == "kaggle_emergency":
+        return kaggle_emergency_iris3b_config(base_config)
+    if normalized == "kaggle_survival":
+        return kaggle_survival_iris3b_config(base_config)
+    if normalized == "auto":
+        if kaggle_runtime:
+            return kaggle_safe_iris3b_config(base_config)
+        return base_config
+    raise ValueError(
+        "memory_profile must be one of auto|default|kaggle_safe|kaggle_safer|kaggle_emergency|kaggle_survival."
+    )
 
 
 def iris3b_config_from_mapping(payload: Mapping[str, Any]) -> IRIS3BConfig:

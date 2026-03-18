@@ -105,3 +105,78 @@ def test_streaming_provider_recovers_from_iterator_error() -> None:
     assert batch.token_count > 0
     assert batch.metadata[0]["records_used"] >= 1
     assert loader_state["calls"] >= 3
+
+
+def test_prefetched_batches_preserve_serial_order_for_synthetic_sources() -> None:
+    manifest = P1StreamingManifest(
+        schema="p1_streaming_manifest/v1",
+        manifest_id="p1-prefetch-test",
+        profile_id="P1",
+        phase="E",
+        commit_posture="committed",
+        default_streaming_mode="auto",
+        sources=(
+            P1StreamingSource(
+                source_id="synth_a",
+                source_kind="synthetic",
+                pool_id="A",
+                pool_role="core",
+                token_weight=0.5,
+                record_weight=0.5,
+                revision="synthetic-v1",
+            ),
+            P1StreamingSource(
+                source_id="synth_b",
+                source_kind="synthetic",
+                pool_id="B",
+                pool_role="core",
+                token_weight=0.5,
+                record_weight=0.5,
+                revision="synthetic-v1",
+            ),
+        ),
+    )
+    provider = P1StreamingProvider(
+        manifest=manifest,
+        tokenizer_handle=TokenizerHandle(
+            id_or_path="dummy",
+            tokenizer=_DummyTokenizer(),
+            fingerprint="dummy-tokenizer",
+        ),
+        run_id="prefetch",
+        data_seed=23,
+        streaming_mode="auto",
+        cache_root=None,
+        snapshot_root=None,
+        sequence_pack_tokens=24,
+        micro_batch_size=1,
+        aux_target_dim=8,
+        state_target_hidden_dim=8,
+    )
+    plan = provider.build_segment_plan(
+        segment_id=0,
+        optimizer_steps=2,
+        gradient_accumulation_steps=2,
+    )
+
+    serial = [
+        provider.sample_batch(
+            segment_id=0,
+            dataset_slice_id=plan.dataset_slice_id,
+            batch_plan=batch_plan,
+        )
+        for batch_plan in plan.steps
+    ]
+    prefetched = list(
+        provider.iter_prefetched_batches(
+            segment_id=0,
+            dataset_slice_id=plan.dataset_slice_id,
+            batch_plans=plan.steps,
+            max_workers=4,
+            prefetch_batches=4,
+        )
+    )
+
+    assert [batch.source_id for batch in prefetched] == [batch.source_id for batch in serial]
+    assert [batch.sample_keys for batch in prefetched] == [batch.sample_keys for batch in serial]
+    assert [batch.token_count for batch in prefetched] == [batch.token_count for batch in serial]

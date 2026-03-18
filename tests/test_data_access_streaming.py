@@ -9,7 +9,7 @@ from iris.train.data.filters import prepare_clean_text
 from iris.train.data.qa_gate import evaluate_text_quality
 
 
-def test_open_streaming_source_uses_file_fallback_for_pes2o(monkeypatch, tmp_path: Path) -> None:
+def test_open_streaming_source_uses_forced_file_fallback_for_pes2o(tmp_path: Path) -> None:
     source = DatasetSourceSpec(
         source_id="pes2o_math_documents",
         hf_path="allenai/peS2o",
@@ -20,25 +20,20 @@ def test_open_streaming_source_uses_file_fallback_for_pes2o(monkeypatch, tmp_pat
         ratio_total=0.2,
         metadata={
             "required_source": "s2orc",
+            "hf_force_file_fallback": True,
             "hf_file_fallback_builder": "json",
-            "hf_repo_file_patterns_by_split": {
-                "train": ["data/v2/train-*.json.gz"],
+            "hf_repo_files_by_split": {
+                "train": [
+                    "data/v2/train-00010-of-00020.json.gz",
+                    "data/v2/train-00011-of-00020.json.gz",
+                ],
             },
         },
-    )
-    monkeypatch.setattr(
-        "iris.train.data.access._list_hf_dataset_files",
-        lambda repo_id, revision: (
-            "data/v2/train-00000-of-00020.json.gz",
-            "data/v2/train-00001-of-00020.json.gz",
-        ),
     )
     calls = []
 
     def loader(dataset_or_builder: str, **kwargs):
         calls.append((dataset_or_builder, kwargs))
-        if dataset_or_builder == "allenai/peS2o":
-            raise RuntimeError("Dataset scripts are no longer supported")
         assert dataset_or_builder == "json"
         return iter(
             [
@@ -59,10 +54,10 @@ def test_open_streaming_source_uses_file_fallback_for_pes2o(monkeypatch, tmp_pat
     assert opened.effective_mode == "hf_online"
     first_record = next(iter(opened.iterable))
     assert first_record["source"] == "s2orc"
-    assert len(calls) == 2
-    assert calls[1][0] == "json"
-    assert calls[1][1]["data_files"][0].startswith(
-        "hf://datasets/allenai/peS2o@0123456789abcdef0123456789abcdef01234567/data/v2/train-"
+    assert len(calls) == 1
+    assert calls[0][0] == "json"
+    assert calls[0][1]["data_files"][0].startswith(
+        "hf://datasets/allenai/peS2o@0123456789abcdef0123456789abcdef01234567/data/v2/train-00010"
     )
 
 
@@ -230,6 +225,7 @@ def test_prepare_clean_text_uses_fallback_fields_and_required_source() -> None:
     }
 
     assert prepare_clean_text(source, record) is not None
+    assert prepare_clean_text(source, dict(record, source="s2orc/train")) is not None
     assert prepare_clean_text(source, dict(record, source="s2ag")) is None
 
 
@@ -329,7 +325,7 @@ def test_prepare_clean_text_uses_document_chunk_fallback_for_pes2o() -> None:
         for idx in range(12)
     )
     record = {
-        "source": "s2orc",
+        "source": "s2orc/train",
         "text": "\n\n".join([good_paragraph] * 5 + [noisy_tail]),
     }
 
