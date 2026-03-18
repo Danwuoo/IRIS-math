@@ -205,6 +205,130 @@ def test_open_streaming_source_materializes_prooflang_zip_snapshot(monkeypatch, 
     assert marker.exists()
 
 
+def test_open_streaming_source_uses_snapshot_fallback_root(monkeypatch, tmp_path: Path) -> None:
+    archive_path = tmp_path / "proofs.zip"
+    with ZipFile(archive_path, "w") as archive:
+        archive.writestr(
+            "proofs.tsv",
+            "paper\tproof\n1234.5678\tThis proof text is sufficiently long to survive the cleaner.\n",
+        )
+
+    primary_root = tmp_path / "primary_snapshots"
+    fallback_root = tmp_path / "fallback_snapshots"
+    source = DatasetSourceSpec(
+        source_id="prooflang_document_aux",
+        hf_path="proofcheck/prooflang",
+        hf_name="proofs",
+        split="train",
+        revision="00112233445566778899aabbccddeeff00112233",
+        text_field="proof",
+        ratio_total=0.15,
+        required=True,
+        local_snapshot_pattern="**/*.tsv",
+        metadata={"hf_snapshot_archives": ["proofs.zip"]},
+    )
+    monkeypatch.setattr(
+        "iris.train.data.access._download_hf_dataset_file",
+        lambda repo_id, revision, filename, cache_dir=None: archive_path,
+    )
+
+    def loader(dataset_or_builder: str, **kwargs):
+        if dataset_or_builder == "proofcheck/prooflang":
+            raise RuntimeError("Dataset scripts are no longer supported")
+        assert dataset_or_builder == "csv"
+        return iter(
+            [
+                {
+                    "paper": "1234.5678",
+                    "proof": "This proof text is sufficiently long to survive the cleaner.",
+                }
+            ]
+        )
+
+    opened = open_streaming_source(
+        source,
+        streaming_mode="auto",
+        snapshot_root=primary_root,
+        snapshot_fallback_root=fallback_root,
+        loader=loader,
+    )
+
+    assert opened.effective_mode == "local_snapshot"
+    assert next(iter(opened.iterable))["paper"] == "1234.5678"
+    marker = (
+        fallback_root
+        / "prooflang_document_aux"
+        / "_materialized"
+        / "00112233445566778899aabbccddeeff00112233"
+        / ".materialized.json"
+    )
+    assert marker.exists()
+    assert not (primary_root / "prooflang_document_aux").exists()
+
+
+def test_open_streaming_source_materializes_prooflang_when_snapshot_root_is_stale(
+    monkeypatch, tmp_path: Path
+) -> None:
+    archive_path = tmp_path / "proofs.zip"
+    with ZipFile(archive_path, "w") as archive:
+        archive.writestr(
+            "proofs.tsv",
+            "paper\tproof\n1234.5678\tThis proof text is sufficiently long to survive the cleaner.\n",
+        )
+
+    stale_root = tmp_path / "prooflang_document_aux"
+    stale_root.mkdir(parents=True, exist_ok=True)
+    (stale_root / "_hf_hub_cache").mkdir(parents=True, exist_ok=True)
+
+    source = DatasetSourceSpec(
+        source_id="prooflang_document_aux",
+        hf_path="proofcheck/prooflang",
+        hf_name="proofs",
+        split="train",
+        revision="00112233445566778899aabbccddeeff00112233",
+        text_field="proof",
+        ratio_total=0.15,
+        required=True,
+        local_snapshot_pattern="**/*.tsv",
+        metadata={"hf_snapshot_archives": ["proofs.zip"]},
+    )
+    monkeypatch.setattr(
+        "iris.train.data.access._download_hf_dataset_file",
+        lambda repo_id, revision, filename, cache_dir=None: archive_path,
+    )
+
+    def loader(dataset_or_builder: str, **kwargs):
+        if dataset_or_builder == "proofcheck/prooflang":
+            raise RuntimeError("Dataset scripts are no longer supported")
+        assert dataset_or_builder == "csv"
+        return iter(
+            [
+                {
+                    "paper": "1234.5678",
+                    "proof": "This proof text is sufficiently long to survive the cleaner.",
+                }
+            ]
+        )
+
+    opened = open_streaming_source(
+        source,
+        streaming_mode="auto",
+        snapshot_root=tmp_path,
+        loader=loader,
+    )
+
+    assert opened.effective_mode == "local_snapshot"
+    assert next(iter(opened.iterable))["paper"] == "1234.5678"
+    marker = (
+        tmp_path
+        / "prooflang_document_aux"
+        / "_materialized"
+        / "00112233445566778899aabbccddeeff00112233"
+        / ".materialized.json"
+    )
+    assert marker.exists()
+
+
 def test_prepare_clean_text_uses_fallback_fields_and_required_source() -> None:
     source = DatasetSourceSpec(
         source_id="lean_workbook_bridge",

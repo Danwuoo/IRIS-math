@@ -3,7 +3,7 @@
 **Document Type:** Canonical Binding Policy  
 **Scope:** Training data pools, benchmark tiering, contamination control, multimodal parsing policy, and provenance requirements for IRIS-math v2  
 **Gate policy:** Data-policy changes require regression review under `docs/06_Regression_and_Phase_Gates.md`  
-**Related active docs:** `docs/14_Multimodal_Document_Pipeline.md`, `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/17_Scaling_Promotion_and_Readiness.md`
+**Related active docs:** `docs/12_Multimodal_Document_Pipeline.md`, `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/15_Scaling_Promotion_and_Readiness.md`
 
 ---
 
@@ -24,8 +24,8 @@ This is a constitution, not a single frozen recipe.
 Exact realized ratios belong to active profiles and run manifests.
 This document therefore defines the executable policy objects and minimum compliance fields that profiles and runs must instantiate.
 
-Benchmark family-specific governance is maintained in `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
-Document-pipeline mechanics are elaborated in `docs/14_Multimodal_Document_Pipeline.md`.
+Benchmark family-specific governance is maintained in `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`.
+Document-pipeline mechanics are elaborated in `docs/12_Multimodal_Document_Pipeline.md`.
 
 ---
 
@@ -354,7 +354,7 @@ Preferred uses:
 
 Benchmark usage is governed by three tiers.
 
-Benchmark family registry and family-specific allowed uses are governed by `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
+Benchmark family registry and family-specific allowed uses are governed by `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`.
 
 | Tier | Visibility | Allowed Use | Default Role |
 | --- | --- | --- | --- |
@@ -391,7 +391,7 @@ Family policies may be stricter than this table, but may not be looser without a
 | `process_fragment` | first representation step, branch-choice snippet, invariant proposal, verifier contrast pair | allowed when explicitly declared | fragment must not reconstruct the full official solution on its own |
 | `theorem_or_problem_statement` | benchmark statement text, formal theorem statement | blocked by default | family policy must explicitly allow it and Tier 2 must split by theorem/problem family identity |
 | `proof_shape_fragment` | lemma skeleton, tactic-family outline, non-terminal proof plan | conditional | fragment must be canonicalized to omit decisive terminal derivations and Tier 2 must split by `proof_pattern` |
-| `full_problem_solution_pair` | full item plus end-to-end official solution or proof | blocked for the registered families in `docs/15_Benchmark_Registry_and_Tiering_Playbook.md` | future exceptions require explicit family registration and regression review |
+| `full_problem_solution_pair` | full item plus end-to-end official solution or proof | blocked for the registered families in `docs/13_Benchmark_Registry_and_Tiering_Playbook.md` | future exceptions require explicit family registration and regression review |
 
 Rules:
 
@@ -441,14 +441,14 @@ Use this tier for:
 
 ### 3.3.1 Default Tuning Firewalls for Benchmark Evaluation
 
-Once a benchmark family has any Tier 1 train-visible exposure, the following defaults apply unless the family policy in `docs/15_Benchmark_Registry_and_Tiering_Playbook.md` is stricter.
+Once a benchmark family has any Tier 1 train-visible exposure, the following defaults apply unless the family policy in `docs/13_Benchmark_Registry_and_Tiering_Playbook.md` is stricter.
 
 `observe_only` surfaces allowed at fixed declared cadence:
 
 - family-level Tier 2 aggregate metrics,
 - family-level `benchmark.tier2.generalization_gap`,
 - contamination, provenance, and leakage summaries,
-- declared pass/fail gate summaries required by `docs/06_Regression_and_Phase_Gates.md` or `docs/17_Scaling_Promotion_and_Readiness.md`.
+- declared pass/fail gate summaries required by `docs/06_Regression_and_Phase_Gates.md` or `docs/15_Scaling_Promotion_and_Readiness.md`.
 
 `tuning_blocked` surfaces:
 

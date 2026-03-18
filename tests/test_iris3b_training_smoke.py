@@ -116,3 +116,82 @@ def test_p1_training_cycle_writes_governed_checkpoint_and_metrics(tmp_path: Path
     assert metrics["runtime_lock_manifest_sha256"]
     assert metrics["data.source_manifest_sha256"]
     assert metrics["checkpoint_payload_ref"]
+
+
+def test_p1_training_cycle_prunes_old_checkpoint_payloads(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    _write_synthetic_manifest(manifest_path)
+    model_config = replace(
+        small_test_config(),
+        segment_steps=1,
+        gradient_accumulation_steps=1,
+        micro_batch_size=1,
+        warmup_steps=1,
+    ).validate()
+    model_config_path = tmp_path / "model_config.json"
+    model_config_path.write_text(
+        json.dumps(model_config.to_payload(), sort_keys=True, indent=2),
+        encoding="utf-8",
+    )
+    run_dir = tmp_path / "run_prune"
+    repo_root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(repo_root / "src")
+    env["JAX_DISABLE_JIT"] = "1"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "scripts" / "train_p1_3b.py"),
+            "cycle",
+            "--output-dir",
+            str(run_dir),
+            "--run-id",
+            "smoke-prune",
+            "--manifest-path",
+            str(manifest_path),
+            "--model-config-json",
+            str(model_config_path),
+            "--streaming-mode",
+            "auto",
+            "--device",
+            "cpu",
+            "--no-strict-jax",
+            "--max-cycle-minutes",
+            "1",
+            "--max-segments",
+            "2",
+            "--checkpoint-retention-limit",
+            "1",
+            "--tokenizer-workdir",
+            str(tmp_path / "tok_work_prune"),
+            "--dataset-cache-limit-gib",
+            "1",
+            "--no-download-latest",
+            "--no-sync-checkpoint",
+        ],
+        cwd=str(repo_root),
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    summary = json.loads(proc.stdout.strip().splitlines()[-1])
+
+    assert summary["status"] == "Done"
+    assert summary["segments_completed"] == 2
+    assert summary["checkpoint_retention_limit"] == 1
+    assert summary["checkpoint_retention"]["pruned_segment_ids"] == [0]
+
+    payload_root = run_dir / "checkpoints" / "payloads"
+    remaining_payloads = sorted(path.name for path in payload_root.iterdir())
+    assert remaining_payloads == ["segment_000001"]
+
+    events = load_journal(run_dir / "segment_journal.jsonl")
+    applied = [event for event in events if event.get("status") == "APPLIED"]
+    assert len(applied) == 2
+
+    with pytest.raises(RuntimeError, match="pruned by retention policy"):
+        load_iris3b_checkpoint(run_dir / applied[0]["checkpoint_ref"])
+
+    checkpoint = load_iris3b_checkpoint(run_dir / applied[-1]["checkpoint_ref"])
+    assert checkpoint["segment_id_last_applied"] == 1

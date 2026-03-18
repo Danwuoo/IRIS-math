@@ -244,12 +244,34 @@ def _open_hf_stream(
             ) from fallback_error
 
 
-def _snapshot_candidates(snapshot_root: Path, source: DatasetSourceSpec) -> Tuple[Path, ...]:
-    root = Path(snapshot_root)
-    direct = root / source.source_id
-    by_path = root / source.hf_path
-    by_flat_path = root / source.hf_path.replace("/", "__")
-    return (direct, by_path, by_flat_path)
+def _snapshot_roots(
+    snapshot_root: Path | None,
+    snapshot_fallback_root: Path | None = None,
+) -> Tuple[Path, ...]:
+    roots = []
+    for candidate in (snapshot_root, snapshot_fallback_root):
+        if candidate is None:
+            continue
+        path = Path(candidate)
+        if path in roots:
+            continue
+        roots.append(path)
+    return tuple(roots)
+
+
+def _snapshot_candidates(
+    snapshot_root: Path | None,
+    source: DatasetSourceSpec,
+    *,
+    snapshot_fallback_root: Path | None = None,
+) -> Tuple[Path, ...]:
+    candidates = []
+    for root in _snapshot_roots(snapshot_root, snapshot_fallback_root):
+        direct = root / source.source_id
+        by_path = root / source.hf_path
+        by_flat_path = root / source.hf_path.replace("/", "__")
+        candidates.extend((direct, by_path, by_flat_path))
+    return tuple(candidates)
 
 
 def _open_files_snapshot(
@@ -302,14 +324,19 @@ def _open_files_snapshot(
 def _materialize_snapshot_from_hf(
     source: DatasetSourceSpec,
     *,
-    snapshot_root: Path,
+    snapshot_root: Path | None,
+    snapshot_fallback_root: Path | None = None,
 ) -> Path | None:
     archive_names = _metadata_list(source.metadata, "hf_snapshot_archives")
     if not archive_names:
         return None
+    snapshot_roots = _snapshot_roots(snapshot_root, snapshot_fallback_root)
+    if not snapshot_roots:
+        return None
+    target_root = snapshot_roots[-1]
 
     materialized_root = (
-        Path(snapshot_root)
+        Path(target_root)
         / source.source_id
         / "_materialized"
         / _stable_snapshot_revision(source.revision)
@@ -322,7 +349,7 @@ def _materialize_snapshot_from_hf(
     copied_root = materialized_root / "files"
     extracted_root.mkdir(parents=True, exist_ok=True)
     copied_root.mkdir(parents=True, exist_ok=True)
-    cache_dir = Path(snapshot_root) / "_hf_hub_cache"
+    cache_dir = Path(target_root) / "_hf_hub_cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     materialized_files = []
@@ -368,28 +395,47 @@ def _open_local_snapshot(
     source: DatasetSourceSpec,
     *,
     snapshot_root: Path | None,
+    snapshot_fallback_root: Path | None = None,
     loader: LoadDatasetFn,
 ) -> Iterable[Mapping[str, Any]]:
-    if snapshot_root is None:
+    if snapshot_root is None and snapshot_fallback_root is None:
         raise DatasetAccessError(
-            f"Local snapshot mode requested for source '{source.source_id}' but snapshot_root is missing."
+            f"Local snapshot mode requested for source '{source.source_id}' but no snapshot roots are configured."
         )
 
-    for candidate in _snapshot_candidates(Path(snapshot_root), source):
+    last_candidate_error: DatasetAccessError | None = None
+    for candidate in _snapshot_candidates(
+        snapshot_root,
+        source,
+        snapshot_fallback_root=snapshot_fallback_root,
+    ):
         if not candidate.exists():
             continue
         if candidate.is_dir() or candidate.is_file():
-            return _open_files_snapshot(source, snapshot_path=candidate, loader=loader)
+            try:
+                return _open_files_snapshot(source, snapshot_path=candidate, loader=loader)
+            except DatasetAccessError as error:
+                # Stale or partially materialized snapshot roots must not block
+                # later candidates or archive materialization fallback in auto mode.
+                last_candidate_error = error
 
     materialized_snapshot = _materialize_snapshot_from_hf(
         source,
-        snapshot_root=Path(snapshot_root),
+        snapshot_root=snapshot_root,
+        snapshot_fallback_root=snapshot_fallback_root,
     )
     if materialized_snapshot is not None:
-        return _open_files_snapshot(source, snapshot_path=materialized_snapshot, loader=loader)
+        try:
+            return _open_files_snapshot(source, snapshot_path=materialized_snapshot, loader=loader)
+        except DatasetAccessError as error:
+            last_candidate_error = error
 
+    if last_candidate_error is not None:
+        raise last_candidate_error
+
+    searched_roots = ", ".join(str(path) for path in _snapshot_roots(snapshot_root, snapshot_fallback_root))
     raise DatasetAccessError(
-        f"No local snapshot directory found for source '{source.source_id}' under {snapshot_root}."
+        f"No local snapshot directory found for source '{source.source_id}' under [{searched_roots}]."
     )
 
 
@@ -398,6 +444,7 @@ def open_streaming_source(
     *,
     streaming_mode: StreamingMode,
     snapshot_root: Path | None = None,
+    snapshot_fallback_root: Path | None = None,
     loader: LoadDatasetFn | None = None,
 ) -> SourceAccessResult:
     loader = loader or _default_loader
@@ -419,7 +466,12 @@ def open_streaming_source(
 
     if normalized_mode in {"auto", "local_snapshot"}:
         try:
-            iterable = _open_local_snapshot(source, snapshot_root=snapshot_root, loader=loader)
+            iterable = _open_local_snapshot(
+                source,
+                snapshot_root=snapshot_root,
+                snapshot_fallback_root=snapshot_fallback_root,
+                loader=loader,
+            )
             return SourceAccessResult(source_id=source.source_id, iterable=iterable, effective_mode="local_snapshot")
         except Exception as error:
             local_error = error

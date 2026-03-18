@@ -208,6 +208,7 @@ class P1StreamingProvider:
         streaming_mode: str,
         cache_root: Path | None,
         snapshot_root: Path | None,
+        snapshot_fallback_root: Path | None,
         sequence_pack_tokens: int,
         micro_batch_size: int,
         aux_target_dim: int,
@@ -224,6 +225,7 @@ class P1StreamingProvider:
         self.streaming_mode = str(streaming_mode).strip().lower() or manifest.default_streaming_mode
         self.cache_root = Path(cache_root) if cache_root is not None else None
         self.snapshot_root = Path(snapshot_root) if snapshot_root is not None else None
+        self.snapshot_fallback_root = Path(snapshot_fallback_root) if snapshot_fallback_root is not None else None
         self.sequence_pack_tokens = int(max(sequence_pack_tokens, 8))
         self.micro_batch_size = int(max(micro_batch_size, 1))
         self.aux_target_dim = int(max(aux_target_dim, 1))
@@ -251,6 +253,7 @@ class P1StreamingProvider:
                     dataset_spec,
                     streaming_mode=self.streaming_mode,
                     snapshot_root=self.snapshot_root,
+                    snapshot_fallback_root=self.snapshot_fallback_root,
                     loader=self.loader,
                 )
             except Exception as error:
@@ -384,6 +387,7 @@ class P1StreamingProvider:
             dataset_spec,
             streaming_mode=self.streaming_mode,
             snapshot_root=self.snapshot_root,
+            snapshot_fallback_root=self.snapshot_fallback_root,
             loader=self.loader,
         )
         return source, opened
@@ -394,6 +398,7 @@ class P1StreamingProvider:
             dataset_spec,
             streaming_mode=self.streaming_mode,
             snapshot_root=self.snapshot_root,
+            snapshot_fallback_root=self.snapshot_fallback_root,
             loader=self.loader,
         )
 

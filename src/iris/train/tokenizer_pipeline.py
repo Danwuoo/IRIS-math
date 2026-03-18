@@ -80,6 +80,7 @@ def iter_manifest_texts(
     *,
     streaming_mode: str,
     snapshot_root: Path | None,
+    snapshot_fallback_root: Path | None,
     sample_records_per_source: int,
     seed: int,
 ) -> Iterable[str]:
@@ -96,6 +97,7 @@ def iter_manifest_texts(
             dataset_spec,
             streaming_mode=streaming_mode,
             snapshot_root=snapshot_root,
+            snapshot_fallback_root=snapshot_fallback_root,
         )
         iterator = iter(opened.iterable)
         yielded = 0
@@ -118,6 +120,7 @@ def _collect_source_texts(
     *,
     streaming_mode: str,
     snapshot_root: Path | None,
+    snapshot_fallback_root: Path | None,
     sample_records_per_source: int,
     seed: int,
 ) -> tuple[str, ...]:
@@ -135,6 +138,7 @@ def _collect_source_texts(
         dataset_spec,
         streaming_mode=streaming_mode,
         snapshot_root=snapshot_root,
+        snapshot_fallback_root=snapshot_fallback_root,
     )
     iterator = iter(opened.iterable)
     rows = []
@@ -160,6 +164,7 @@ def write_tokenizer_corpus(
     output_dir: Path,
     streaming_mode: str,
     snapshot_root: Path | None,
+    snapshot_fallback_root: Path | None,
     build_config: TokenizerBuildConfig,
     corpus_workers: int = 1,
 ) -> Path:
@@ -174,6 +179,7 @@ def write_tokenizer_corpus(
                 source,
                 streaming_mode=streaming_mode,
                 snapshot_root=snapshot_root,
+                snapshot_fallback_root=snapshot_fallback_root,
                 sample_records_per_source=build_config.sample_records_per_source,
                 seed=build_config.seed,
             )
@@ -185,6 +191,7 @@ def write_tokenizer_corpus(
                     source,
                     streaming_mode=streaming_mode,
                     snapshot_root=snapshot_root,
+                    snapshot_fallback_root=snapshot_fallback_root,
                     sample_records_per_source=build_config.sample_records_per_source,
                     seed=build_config.seed,
                 )
@@ -263,6 +270,7 @@ def train_sentencepiece_tokenizer(
     output_dir: Path,
     streaming_mode: str,
     snapshot_root: Path | None,
+    snapshot_fallback_root: Path | None,
     build_config: TokenizerBuildConfig,
     corpus_workers: int = 1,
     sentencepiece_threads: int = 1,
@@ -295,6 +303,7 @@ def train_sentencepiece_tokenizer(
         output_dir=output_root,
         streaming_mode=streaming_mode,
         snapshot_root=snapshot_root,
+        snapshot_fallback_root=snapshot_fallback_root,
         build_config=build_config,
         corpus_workers=corpus_workers,
     )

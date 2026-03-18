@@ -2,7 +2,7 @@
 
 **Document Type:** Engineering Governance (Policy-Binding)  
 **Scope:** Segment transactions, exactly-once resume, runtime lock, reproducibility controls, and provenance requirements for IRIS-math v2  
-**Related active docs:** `docs/05_Eval_Metrics_Spec.md`, `docs/06_Regression_and_Phase_Gates.md`, `docs/07_Data_Constitution.md`, `docs/09_Training_Profiles_and_Scaling.md`, `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`, `docs/18_Optimization_and_Learning_Contract.md`
+**Related active docs:** `docs/05_Eval_Metrics_Spec.md`, `docs/06_Regression_and_Phase_Gates.md`, `docs/07_Data_Constitution.md`, `docs/09_Training_Profiles_and_Scaling.md`, `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/14_Verifier_and_Formalization_Stack.md`, `docs/15_Scaling_Promotion_and_Readiness.md`, `docs/16_Optimization_and_Learning_Contract.md`
 
 ---
 
@@ -11,10 +11,10 @@
 - This document is policy-binding for training operations.
 - It does not override architecture, State IR, level, or credit-assignment contracts.
 - Benchmark handling in training must follow `docs/07_Data_Constitution.md`; this document governs execution semantics, not benchmark policy by itself.
-- Benchmark-family-specific allowances and forbidden uses are governed by `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
-- Verifier evidence interpretation is governed by `docs/16_Verifier_and_Formalization_Stack.md`.
-- Profile-readiness claims are governed by `docs/17_Scaling_Promotion_and_Readiness.md`.
-- Learning-objective family semantics are governed by `docs/18_Optimization_and_Learning_Contract.md`.
+- Benchmark-family-specific allowances and forbidden uses are governed by `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`.
+- Verifier evidence interpretation is governed by `docs/14_Verifier_and_Formalization_Stack.md`.
+- Profile-readiness claims are governed by `docs/15_Scaling_Promotion_and_Readiness.md`.
+- Learning-objective family semantics are governed by `docs/16_Optimization_and_Learning_Contract.md`.
 
 ---
 
@@ -51,7 +51,7 @@ Benchmark policy summary:
 - Tier 1 benchmark data may be train-visible only under the declared policy in `docs/07_Data_Constitution.md`.
 - Tier 2 and Tier 3 remain evaluation surfaces.
 - Governance must record which executable data-realization and decontamination policies were active for the run.
-- Family-specific benchmark usage must also remain consistent with `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
+- Family-specific benchmark usage must also remain consistent with `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`.
 
 ---
 
@@ -259,7 +259,7 @@ Rules:
 4. Automatic fallback from `hf_online` to `local_snapshot` is allowed only when the fallback preserves the same source manifest semantics.
    The requested mode and effective mode must both be persisted.
 5. Raw `PDF`, `DOCX`, `image`, or `scanned_note` sources hosted via Hugging Face are not directly train-visible through a text-only streaming path.
-   They must first become canonical records under `docs/07_Data_Constitution.md` and `docs/14_Multimodal_Document_Pipeline.md`.
+   They must first become canonical records under `docs/07_Data_Constitution.md` and `docs/12_Multimodal_Document_Pipeline.md`.
 6. Streaming does not waive benchmark-family firewalls, decontamination, or provenance obligations.
 
 ### 8.2 Streaming Identity and Persistence Requirements
@@ -338,4 +338,4 @@ Each such control must include:
 - `docs/06_Regression_and_Phase_Gates.md`
 - `docs/07_Data_Constitution.md`
 - `docs/09_Training_Profiles_and_Scaling.md`
-- `docs/18_Optimization_and_Learning_Contract.md`
+- `docs/16_Optimization_and_Learning_Contract.md`

@@ -2,7 +2,7 @@
 
 **Document Type:** Active Profile Note  
 **Scope:** Staged scaling profiles for IRIS-math v2  
-**Boundary:** Exact per-run hyperparameters live in run manifests and configs; this document defines hardware/purpose profile families and intended purpose. Promotion authority lives in `docs/17_Scaling_Promotion_and_Readiness.md`; learning-objective semantics live in `docs/18_Optimization_and_Learning_Contract.md`.
+**Boundary:** Exact per-run hyperparameters live in run manifests and configs; this document defines hardware/purpose profile families and intended purpose. Promotion authority lives in `docs/15_Scaling_Promotion_and_Readiness.md`; learning-objective semantics live in `docs/16_Optimization_and_Learning_Contract.md`.
 
 ---
 
@@ -31,7 +31,7 @@ Profiles are hardware/purpose families, not automatic capability stages.
 | `P3` | `16x H200 SXM` | `30B+` | Long-context proof handling, multi-branch search, stronger verifier-memory interplay |
 | `P4` | `1-8x B200` | `70B / 120B exploratory` | Frontier integration, strong abstraction transfer, unified multimodal math reasoning |
 
-Movement from `P1` to `P4` is governed by capability readiness in `docs/17_Scaling_Promotion_and_Readiness.md`, not by parameter count alone.
+Movement from `P1` to `P4` is governed by capability readiness in `docs/15_Scaling_Promotion_and_Readiness.md`, not by parameter count alone.
 
 ---
 
@@ -162,6 +162,6 @@ Every run that claims alignment with one of these profiles should emit at least:
 
 - `docs/07_Data_Constitution.md` defines what data is allowed and how benchmark tiers work.
 - `docs/08_Training_Run_Governance.md` defines transaction, resume, and provenance rules.
-- `docs/18_Optimization_and_Learning_Contract.md` defines which objective families and curriculum activations may be claimed for a profile.
+- `docs/16_Optimization_and_Learning_Contract.md` defines which objective families and curriculum activations may be claimed for a profile.
 - `docs/06_Regression_and_Phase_Gates.md` defines what suites and gates must pass.
-- `docs/17_Scaling_Promotion_and_Readiness.md` defines whether promotion between profile families is justified.
+- `docs/15_Scaling_Promotion_and_Readiness.md` defines whether promotion between profile families is justified.

@@ -40,6 +40,7 @@ def test_tokenizer_corpus_generation_is_deterministic_for_synthetic_manifest(tmp
         output_dir=tmp_path / "a",
         streaming_mode="auto",
         snapshot_root=None,
+        snapshot_fallback_root=None,
         build_config=build_config,
     )
     path_b = write_tokenizer_corpus(
@@ -47,6 +48,7 @@ def test_tokenizer_corpus_generation_is_deterministic_for_synthetic_manifest(tmp
         output_dir=tmp_path / "b",
         streaming_mode="auto",
         snapshot_root=None,
+        snapshot_fallback_root=None,
         build_config=build_config,
     )
 
@@ -66,6 +68,7 @@ def test_tokenizer_corpus_generation_matches_serial_output_when_parallelized(tmp
         output_dir=tmp_path / "serial",
         streaming_mode="auto",
         snapshot_root=None,
+        snapshot_fallback_root=None,
         build_config=build_config,
         corpus_workers=1,
     )
@@ -74,6 +77,7 @@ def test_tokenizer_corpus_generation_matches_serial_output_when_parallelized(tmp
         output_dir=tmp_path / "parallel",
         streaming_mode="auto",
         snapshot_root=None,
+        snapshot_fallback_root=None,
         build_config=build_config,
         corpus_workers=4,
     )
@@ -92,6 +96,7 @@ def test_sentencepiece_training_produces_reloadable_tokenizer_dir(tmp_path: Path
         output_dir=tmp_path / "tok",
         streaming_mode="auto",
         snapshot_root=None,
+        snapshot_fallback_root=None,
         build_config=TokenizerBuildConfig(
             vocab_size=384,
             sample_records_per_source=4,

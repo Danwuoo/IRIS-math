@@ -271,5 +271,5 @@ Control signals must remain compatible with:
 - `docs/04_Credit_Assignment_and_Recovery.md`
 - `docs/07_Data_Constitution.md`
 - `docs/09_Training_Profiles_and_Scaling.md`
-- `docs/18_Optimization_and_Learning_Contract.md`
-- `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
+- `docs/16_Optimization_and_Learning_Contract.md`
+- `docs/17_Runtime_and_Task_Adjudication_Semantics.md`

@@ -13,7 +13,6 @@ The repository is in a **documentation-first transition**.
 - **Active target:** `IRIS-math v2`
 - **Authority source:** active v2 documents under `docs/`
 - **Implementation reality:** parts of `src/` still reflect the baseline IRIS scaffold and must be treated as transition-state code
-- **Archive material:** `docs/11` and `docs/12` remain for baseline history only
 
 When active v2 docs and baseline implementation disagree, the docs win.
 
@@ -28,7 +27,7 @@ When active v2 docs and baseline implementation disagree, the docs win.
 
 ### 2.2 Active Core Spine and Primary Policy
 
-3. `docs/13_Goals_and_Success_Criteria.md`
+3. `docs/11_Goals_and_Success_Criteria.md`
 4. `docs/07_Data_Constitution.md`
 5. `docs/01_Architecture_Constitution.md`
 6. `docs/02_State_IR_Spec.md`
@@ -41,21 +40,12 @@ When active v2 docs and baseline implementation disagree, the docs win.
 
 ### 2.3 Active Companion Docs
 
-13. `docs/14_Multimodal_Document_Pipeline.md`
-14. `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
-15. `docs/16_Verifier_and_Formalization_Stack.md`
-16. `docs/17_Scaling_Promotion_and_Readiness.md`
-17. `docs/18_Optimization_and_Learning_Contract.md`
-18. `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
-
-### 2.4 Archive
-
-- `docs/11_Phase_D_Diagnostics_Design_Note.md`
-- `docs/12_Phase_E_Execution_Design_Note.md`
-
-Archive notes may mention legacy `StateIR(T,G,O,R,X,M)` or ARC-specific semantics and are not active authority.
-
----
+13. `docs/12_Multimodal_Document_Pipeline.md`
+14. `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`
+15. `docs/14_Verifier_and_Formalization_Stack.md`
+16. `docs/15_Scaling_Promotion_and_Readiness.md`
+17. `docs/16_Optimization_and_Learning_Contract.md`
+18. `docs/17_Runtime_and_Task_Adjudication_Semantics.md`
 
 ## 3. Mandatory Reading Paths
 
@@ -63,51 +53,50 @@ Archive notes may mention legacy `StateIR(T,G,O,R,X,M)` or ARC-specific semantic
 
 1. `docs/00_INDEX.md`
 2. `docs/10_Glossary_and_Normative_Status.md`
-3. `docs/13_Goals_and_Success_Criteria.md`
+3. `docs/11_Goals_and_Success_Criteria.md`
 4. `docs/07_Data_Constitution.md`
 5. `docs/01_Architecture_Constitution.md`
 6. `docs/02_State_IR_Spec.md`
 7. `docs/03_Level_Contracts_L0-L6.md`
 8. `docs/04_Credit_Assignment_and_Recovery.md`
-9. `docs/18_Optimization_and_Learning_Contract.md`
-10. `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
+9. `docs/16_Optimization_and_Learning_Contract.md`
+10. `docs/17_Runtime_and_Task_Adjudication_Semantics.md`
 
 ### 3.2 Conditional Companion Reading
 
 Add the following when relevant:
 
-- `docs/14_Multimodal_Document_Pipeline.md` for document parsing, OCR/layout, diagram handling, multimodal ingestion, and document-grounded reasoning work
-- `docs/15_Benchmark_Registry_and_Tiering_Playbook.md` for benchmark use, contamination controls, homologous split policy, or training/eval governance involving benchmark families
-- `docs/16_Verifier_and_Formalization_Stack.md` for verifier behavior, formalization, proof validity, false accept / false reject policy, or recovery behavior tied to verifier evidence
-- `docs/17_Scaling_Promotion_and_Readiness.md` for scaling, profile promotion, readiness claims, or profile-to-profile advancement
-- `docs/18_Optimization_and_Learning_Contract.md` for learning-objective design, level-addressable losses, curriculum activation, or control/verifier learning semantics
-- `docs/19_Runtime_and_Task_Adjudication_Semantics.md` for runtime loop behavior, stopping semantics, task-family adjudication, verifier-mode binding, or accepted-output policy
+- `docs/12_Multimodal_Document_Pipeline.md` for document parsing, OCR/layout, diagram handling, multimodal ingestion, and document-grounded reasoning work
+- `docs/13_Benchmark_Registry_and_Tiering_Playbook.md` for benchmark use, contamination controls, homologous split policy, or training/eval governance involving benchmark families
+- `docs/14_Verifier_and_Formalization_Stack.md` for verifier behavior, formalization, proof validity, false accept / false reject policy, or recovery behavior tied to verifier evidence
+- `docs/15_Scaling_Promotion_and_Readiness.md` for scaling, profile promotion, readiness claims, or profile-to-profile advancement
+- `docs/16_Optimization_and_Learning_Contract.md` for learning-objective design, level-addressable losses, curriculum activation, or control/verifier learning semantics
+- `docs/17_Runtime_and_Task_Adjudication_Semantics.md` for runtime loop behavior, stopping semantics, task-family adjudication, verifier-mode binding, or accepted-output policy
 
 Add `docs/05`, `docs/06`, `docs/08`, and `docs/09` whenever the task touches metrics, regression, training governance, scaling, or eval policy.
 
 ### 3.3 Training / Evaluation Path
 
 1. `docs/10_Glossary_and_Normative_Status.md`
-2. `docs/13_Goals_and_Success_Criteria.md`
+2. `docs/11_Goals_and_Success_Criteria.md`
 3. `docs/07_Data_Constitution.md`
-4. `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`
-5. `docs/16_Verifier_and_Formalization_Stack.md`
-6. `docs/18_Optimization_and_Learning_Contract.md`
-7. `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
+4. `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`
+5. `docs/14_Verifier_and_Formalization_Stack.md`
+6. `docs/16_Optimization_and_Learning_Contract.md`
+7. `docs/17_Runtime_and_Task_Adjudication_Semantics.md`
 8. `docs/05_Eval_Metrics_Spec.md`
 9. `docs/06_Regression_and_Phase_Gates.md`
 10. `docs/08_Training_Run_Governance.md`
 11. `docs/09_Training_Profiles_and_Scaling.md`
-12. `docs/17_Scaling_Promotion_and_Readiness.md`
+12. `docs/15_Scaling_Promotion_and_Readiness.md`
 
 ---
 
 ## 4. Authority and Transition Reminder
 
 - `docs/01` through `docs/09` define the active v2 core spine and primary policy surfaces.
-- `docs/13` through `docs/19` are active companion docs that elaborate goals, multimodal pipeline rules, benchmark family governance, verifier stack policy, scaling readiness, learning semantics, and runtime/adjudication semantics.
+- `docs/11` through `docs/17` are active companion docs that elaborate goals, multimodal pipeline rules, benchmark family governance, verifier stack policy, scaling readiness, learning semantics, and runtime/adjudication semantics.
 - There is no separate active strategy-note authority above the contract set.
-- `docs/11_Phase_D_Diagnostics_Design_Note.md` and `docs/12_Phase_E_Execution_Design_Note.md` are **archive notes**, not active reading requirements.
 - `docs/codex_plan/*` is workflow guidance only.
 
 ---
@@ -120,8 +109,6 @@ These entries are kept to preserve old references only.
 | --- | --- | --- |
 | `docs/07_Data_Mixture_and_Ingestion.md` | `docs/07_Data_Constitution.md` | renamed |
 | `docs/09_Training_Profile_SingleH100_3B.md` | `docs/09_Training_Profiles_and_Scaling.md` | renamed |
-| `docs/數學模型建議.md` | retired; direction is now carried by the active contract set plus `docs/18` and `docs/19` | retired |
-| `docs/11_Phase_D_Diagnostics_Design_Note.md` | archive only | archived |
-| `docs/12_Phase_E_Execution_Design_Note.md` | archive only | archived |
+| `docs/數學模型建議.md` | retired; direction is now carried by the active contract set plus `docs/16` and `docs/17` | retired |
 
 Earlier pre-consolidation mappings remain historical context only and should not drive new implementation work.

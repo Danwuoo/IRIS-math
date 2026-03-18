@@ -28,13 +28,24 @@ from .governance import (
     write_runtime_lock_manifest,
 )
 from .hf_sync import resolve_dataset_commit_sha
-from .iris3b_checkpoint import export_params_msgpack, load_iris3b_checkpoint, save_iris3b_checkpoint
+from .iris3b_checkpoint import (
+    export_params_msgpack,
+    load_iris3b_checkpoint,
+    prune_checkpoint_payloads,
+    save_iris3b_checkpoint,
+)
 from .iris3b_config import IRIS3BConfig, default_iris3b_config
 from .iris3b_model import init_iris3b_params
 from .journal import APPLIED, PENDING, append_journal_event, journal_head_hash, load_journal, resolve_resume_pointer
 from .tokenizer_pipeline import TokenizerArtifact, TokenizerBuildConfig, train_sentencepiece_tokenizer
 
 _LEVEL_IDS = tuple(f"L{index}" for index in range(7))
+# TEMPORARY TECHNICAL DEBT: reserve a fixed write tail beyond the estimated
+# checkpoint payload so low-headroom Kaggle disks can still append journal and
+# manifest metadata during checkpoint commit. Remove once runtime storage
+# control is policy-governed by artifact-aware IO telemetry.
+# Intended replacement: policy-governed artifact-aware storage budgeting.
+_CHECKPOINT_WRITE_MARGIN_BYTES = 1024 ** 3
 
 
 def _require_train_stack() -> tuple[Any, Any, Any, Any]:
@@ -71,6 +82,18 @@ def _normalize_checkpoint_ref(checkpoint_path: Path, run_dir: Path) -> str:
         return str(checkpoint_path)
 
 
+def _checkpoint_keep_segment_ids(*segment_ids: int) -> tuple[int, ...]:
+    return tuple(
+        sorted(
+            {
+                int(segment_id)
+                for segment_id in segment_ids
+                if int(segment_id) >= 0
+            }
+        )
+    )
+
+
 def _failure_credit_from_level_losses(level_losses: np.ndarray) -> Dict[str, float]:
     values = np.asarray(level_losses, dtype=np.float64)
     values = np.clip(values, a_min=1.0e-8, a_max=None)
@@ -87,21 +110,71 @@ def _should_crash(config: "P1TrainConfig", point: str, segment_id: int) -> bool:
     return str(config.crash_point) == point and int(config.crash_segment) == int(segment_id)
 
 
-def _enforce_cache_budget(config: "P1TrainConfig") -> Dict[str, object]:
+def _estimate_leaf_bytes(value: Any) -> int:
+    nbytes = getattr(value, "nbytes", None)
+    if nbytes is not None:
+        try:
+            return int(nbytes)
+        except (TypeError, ValueError):
+            pass
+    dtype = getattr(value, "dtype", None)
+    shape = getattr(value, "shape", None)
+    if dtype is not None and shape is not None:
+        try:
+            return int(np.dtype(dtype).itemsize) * int(np.prod(shape, dtype=np.int64))
+        except (TypeError, ValueError):
+            pass
+    return 0
+
+
+def _estimate_tree_bytes(tree: Any) -> int:
+    try:
+        import jax
+
+        leaves = jax.tree_util.tree_leaves(tree)
+    except Exception:
+        if isinstance(tree, Mapping):
+            return sum(_estimate_tree_bytes(value) for value in tree.values())
+        if isinstance(tree, (list, tuple)):
+            return sum(_estimate_tree_bytes(value) for value in tree)
+        return _estimate_leaf_bytes(tree)
+    return sum(_estimate_leaf_bytes(leaf) for leaf in leaves)
+
+
+def _estimate_checkpoint_payload_bytes(*, params: Any, opt_state: Any, rng_state: Mapping[str, Any]) -> int:
+    return int(
+        _estimate_tree_bytes(params)
+        + _estimate_tree_bytes(opt_state)
+        + _estimate_tree_bytes(dict(rng_state))
+    )
+
+
+def _enforce_cache_budget(config: "P1TrainConfig", *, reserve_bytes: int = 0) -> Dict[str, object]:
     budget_gib = int(max(config.dataset_cache_limit_gib, 0))
-    free_space_floor_gib = int(max(config.cache_free_space_floor_gib, 0))
-    return enforce_dataset_cache_budget(
-        roots=(config.cache_root, config.snapshot_root),
+    configured_floor_bytes = gib_to_bytes(int(max(config.cache_free_space_floor_gib, 0)))
+    write_reserve_bytes = int(max(reserve_bytes, 0))
+    effective_min_free_bytes = int(configured_floor_bytes)
+    if write_reserve_bytes > 0:
+        effective_min_free_bytes = max(
+            effective_min_free_bytes,
+            int(write_reserve_bytes) + int(_CHECKPOINT_WRITE_MARGIN_BYTES),
+        )
+    summary = enforce_dataset_cache_budget(
+        roots=(config.cache_root, config.snapshot_root, config.snapshot_fallback_root),
         budget_bytes=gib_to_bytes(budget_gib),
-        min_free_bytes=gib_to_bytes(free_space_floor_gib),
+        min_free_bytes=effective_min_free_bytes,
         monitor_roots=(
             config.output_dir,
             config.tokenizer_dir,
             config.tokenizer_workdir,
             config.cache_root,
             config.snapshot_root,
+            config.snapshot_fallback_root,
         ),
     )
+    summary["configured_free_space_floor_bytes"] = int(configured_floor_bytes)
+    summary["checkpoint_write_reserve_bytes"] = int(write_reserve_bytes)
+    return summary
 
 
 def _load_committed_manifest(config: "P1TrainConfig") -> tuple[P1StreamingManifest, Path]:
@@ -129,21 +202,39 @@ def _load_committed_manifest(config: "P1TrainConfig") -> tuple[P1StreamingManife
     return manifest, committed_path
 
 
-def _local_snapshot_manifest(manifest: P1StreamingManifest, snapshot_root: Path | None, output_dir: Path) -> Path | None:
-    if snapshot_root is None:
+def _local_snapshot_manifest(
+    manifest: P1StreamingManifest,
+    snapshot_root: Path | None,
+    snapshot_fallback_root: Path | None,
+    output_dir: Path,
+) -> Path | None:
+    snapshot_roots = [
+        Path(root)
+        for root in (snapshot_root, snapshot_fallback_root)
+        if root is not None
+    ]
+    if not snapshot_roots:
         return None
     rows = []
-    root = Path(snapshot_root)
-    if not root.exists():
+    existing_snapshot_roots = [root for root in snapshot_roots if root.exists()]
+    if not existing_snapshot_roots:
         return None
     for source in manifest.sources:
-        source_root = root / source.source_id
+        source_root = None
+        for root in existing_snapshot_roots:
+            candidate = root / source.source_id
+            if candidate.exists():
+                source_root = candidate
+                break
+        if source_root is None:
+            source_root = existing_snapshot_roots[0] / source.source_id
         rows.append(
             {
                 "source_id": source.source_id,
                 "pool_id": source.pool_id,
                 "snapshot_exists": bool(source_root.exists()),
                 "snapshot_root": str(source_root),
+                "snapshot_search_roots": [str(root) for root in existing_snapshot_roots],
                 "local_snapshot_pattern": source.local_snapshot_pattern,
             }
         )
@@ -153,7 +244,8 @@ def _local_snapshot_manifest(manifest: P1StreamingManifest, snapshot_root: Path 
         json.dumps(
             {
                 "schema": "iris.local_snapshot_manifest/v1",
-                "snapshot_root": str(root),
+                "snapshot_root": str(existing_snapshot_roots[0]),
+                "snapshot_roots": [str(root) for root in existing_snapshot_roots],
                 "sources": rows,
             },
             sort_keys=True,
@@ -184,6 +276,7 @@ def _prepare_tokenizer(
         output_dir=workdir,
         streaming_mode=config.streaming_mode,
         snapshot_root=config.snapshot_root,
+        snapshot_fallback_root=config.snapshot_fallback_root,
         corpus_workers=config.tokenizer_corpus_workers,
         sentencepiece_threads=config.sentencepiece_threads,
         build_config=TokenizerBuildConfig(
@@ -278,6 +371,7 @@ class P1TrainConfig:
     streaming_mode: str = "auto"
     cache_root: Path | None = None
     snapshot_root: Path | None = None
+    snapshot_fallback_root: Path | None = None
     tokenizer_dir: Path | None = None
     tokenizer_workdir: Path | None = None
     tokenizer_sample_records_per_source: int = 2_048
@@ -291,6 +385,7 @@ class P1TrainConfig:
     max_segments: int = 10_000
     dataset_cache_limit_gib: int = 50
     cache_free_space_floor_gib: int = 0
+    checkpoint_retention_limit: int = 0
     hf_token: str | None = None
     runtime_lock_manifest_path: Path | None = None
     crash_point: str = "none"
@@ -314,6 +409,9 @@ class P1TrainConfig:
             "streaming_mode": self.streaming_mode,
             "cache_root": str(self.cache_root) if self.cache_root is not None else None,
             "snapshot_root": str(self.snapshot_root) if self.snapshot_root is not None else None,
+            "snapshot_fallback_root": (
+                str(self.snapshot_fallback_root) if self.snapshot_fallback_root is not None else None
+            ),
             "tokenizer_dir": str(self.tokenizer_dir) if self.tokenizer_dir is not None else None,
             "tokenizer_workdir": str(self.tokenizer_workdir) if self.tokenizer_workdir is not None else None,
             "tokenizer_sample_records_per_source": int(self.tokenizer_sample_records_per_source),
@@ -327,6 +425,7 @@ class P1TrainConfig:
             "max_segments": int(self.max_segments),
             "dataset_cache_limit_gib": int(self.dataset_cache_limit_gib),
             "cache_free_space_floor_gib": int(self.cache_free_space_floor_gib),
+            "checkpoint_retention_limit": int(self.checkpoint_retention_limit),
             "runtime_lock_manifest_path": (
                 str(self.runtime_lock_manifest_path) if self.runtime_lock_manifest_path is not None else None
             ),
@@ -363,7 +462,12 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
     manifest, committed_manifest_path = _load_committed_manifest(config)
     tokenizer_handle, tokenizer_artifact, tokenizer_root = _prepare_tokenizer(config=config, manifest=manifest)
     cache_budget_summary = _enforce_cache_budget(config)
-    snapshot_manifest_path = _local_snapshot_manifest(manifest, config.snapshot_root, output_dir)
+    snapshot_manifest_path = _local_snapshot_manifest(
+        manifest,
+        config.snapshot_root,
+        config.snapshot_fallback_root,
+        output_dir,
+    )
 
     provider = P1StreamingProvider(
         manifest=manifest,
@@ -373,6 +477,7 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
         streaming_mode=config.streaming_mode,
         cache_root=config.cache_root,
         snapshot_root=config.snapshot_root,
+        snapshot_fallback_root=config.snapshot_fallback_root,
         sequence_pack_tokens=model_config.sequence_pack_tokens,
         micro_batch_size=model_config.micro_batch_size,
         aux_target_dim=model_config.aux_target_dim,
@@ -383,6 +488,13 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
 
     events = load_journal(journal_path)
     next_segment, last_applied, pending_event = resolve_resume_pointer(events)
+    last_applied_segment_id = int(last_applied.get("segment_id", -1)) if last_applied is not None else -1
+    checkpoint_retention_summary: Dict[str, Any] = prune_checkpoint_payloads(
+        checkpoint_dir=checkpoints_dir,
+        keep_last=int(max(config.checkpoint_retention_limit, 0)),
+        keep_segment_ids=_checkpoint_keep_segment_ids(last_applied_segment_id),
+    )
+    cache_budget_summary = _enforce_cache_budget(config)
     optimizer = _optimizer_for_config(optax, model_config)
     grad_fn, accumulate_grads, apply_grads = _train_functions(model_config, optimizer)
 
@@ -418,6 +530,7 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
     deadline = time.monotonic() + max(int(config.max_cycle_minutes), 1) * 60.0
     last_checkpoint_manifest_path: Path | None = None
     last_checkpoint_payload_ref = ""
+    last_estimated_checkpoint_payload_bytes = 0
     last_dataset_slice_id = ""
     last_plan_hash = ""
     last_batch = None
@@ -577,7 +690,32 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
                 "resume_path_id": effective_resume_path,
             },
         }
-        cache_budget_summary = _enforce_cache_budget(config)
+        last_estimated_checkpoint_payload_bytes = _estimate_checkpoint_payload_bytes(
+            params=params,
+            opt_state=opt_state,
+            rng_state=rng_state,
+        )
+        checkpoint_retention_summary = prune_checkpoint_payloads(
+            checkpoint_dir=checkpoints_dir,
+            keep_last=int(max(config.checkpoint_retention_limit, 0)),
+            keep_segment_ids=_checkpoint_keep_segment_ids(last_applied_segment_id),
+        )
+        cache_budget_summary = _enforce_cache_budget(
+            config,
+            reserve_bytes=last_estimated_checkpoint_payload_bytes,
+        )
+        required_free_bytes = int(cache_budget_summary.get("free_space_floor_bytes", 0))
+        free_bytes_after = int(cache_budget_summary.get("free_bytes_after", 0))
+        if required_free_bytes > 0 and free_bytes_after < required_free_bytes:
+            raise RuntimeError(
+                "Insufficient disk headroom to commit the next checkpoint payload: "
+                f"free_bytes_after={free_bytes_after}, "
+                f"required_free_bytes={required_free_bytes}, "
+                f"estimated_checkpoint_payload_bytes={last_estimated_checkpoint_payload_bytes}, "
+                f"checkpoint_retention_limit={int(config.checkpoint_retention_limit)}. "
+                "Either increase writable disk capacity, reduce checkpoint payload size, "
+                "or place checkpoints on a roomier volume."
+            )
         last_checkpoint_manifest_path = save_iris3b_checkpoint(
             checkpoint_dir=checkpoints_dir,
             segment_id=segment_id,
@@ -641,6 +779,13 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
                 "checkpoint_ref": checkpoint_ref,
             },
         )
+        last_applied_segment_id = int(segment_id)
+        checkpoint_retention_summary = prune_checkpoint_payloads(
+            checkpoint_dir=checkpoints_dir,
+            keep_last=int(max(config.checkpoint_retention_limit, 0)),
+            keep_segment_ids=_checkpoint_keep_segment_ids(last_applied_segment_id),
+        )
+        cache_budget_summary = _enforce_cache_budget(config)
 
         if last_batch is None:
             raise RuntimeError("Training segment completed without a batch; this should be unreachable.")
@@ -730,6 +875,12 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
                 "data.effective_streaming_mode": source_manifest.effective_streaming_mode,
                 "data.local_snapshot_manifest_ref": str(snapshot_manifest_path) if snapshot_manifest_path is not None else "",
                 "checkpoint_payload_ref": last_checkpoint_payload_ref,
+                "checkpoint_retention_limit": int(config.checkpoint_retention_limit),
+                "checkpoint_retention_deleted_bytes": int(checkpoint_retention_summary.get("deleted_bytes", 0)),
+                "checkpoint_retention_pruned_segment_ids": [
+                    int(segment_id) for segment_id in checkpoint_retention_summary.get("pruned_segment_ids", [])
+                ],
+                "estimated_checkpoint_payload_bytes": int(last_estimated_checkpoint_payload_bytes),
             },
         )
         append_jsonl(metrics_path, metrics)
@@ -778,6 +929,9 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
         "realized_tokens": int(realized_tokens),
         "dataset_cache_limit_gib": int(config.dataset_cache_limit_gib),
         "cache_free_space_floor_gib": int(config.cache_free_space_floor_gib),
+        "checkpoint_retention_limit": int(config.checkpoint_retention_limit),
+        "checkpoint_retention": dict(checkpoint_retention_summary),
+        "estimated_checkpoint_payload_bytes": int(last_estimated_checkpoint_payload_bytes),
         "dataset_cache_budget": cache_budget_summary,
     }
 

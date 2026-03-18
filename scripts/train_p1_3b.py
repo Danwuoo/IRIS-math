@@ -123,6 +123,39 @@ def _resolve_cache_free_space_floor_gib(*, kaggle_runtime: bool, requested_floor
     return 12
 
 
+def _resolve_snapshot_fallback_root(
+    *,
+    kaggle_runtime: bool,
+    requested_root: Path | None,
+) -> Path | None:
+    if requested_root is not None:
+        return Path(requested_root)
+    if not kaggle_runtime:
+        return None
+    # TEMPORARY TECHNICAL DEBT: spill local snapshot materialization into a
+    # dedicated /kaggle/working subtree so reproducible-but-rebuildable
+    # snapshot artifacts do not crowd the primary run/checkpoint directory.
+    # Remove once runtime storage placement is governed by a profile-aware
+    # artifact policy instead of this fixed Kaggle fallback path.
+    # Intended replacement: policy-governed artifact placement for training IO.
+    return Path("/kaggle/working/iris_p1_spill/snapshots")
+
+
+def _resolve_checkpoint_retention_limit(*, kaggle_runtime: bool, requested_limit: int) -> int:
+    requested = int(requested_limit)
+    if requested > 0:
+        return requested
+    if not kaggle_runtime:
+        return 0
+    # TEMPORARY TECHNICAL DEBT: cap retained checkpoint payloads on Kaggle so
+    # ephemeral storage is not exhausted by fully governed APPLIED payloads
+    # accumulating faster than the next cycle can export or sync them. Remove
+    # once checkpoint placement/retention is policy-governed by artifact-aware
+    # runtime storage management instead of this fixed fallback cap.
+    # Intended replacement: policy-governed checkpoint artifact lifecycle.
+    return 1
+
+
 def _available_cpu_count() -> int:
     try:
         return max(len(os.sched_getaffinity(0)), 1)
@@ -203,9 +236,11 @@ def _build_cycle_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--model-config-json", type=Path, default=None)
     parser.add_argument("--streaming-mode", type=str, default="auto", choices=["auto", "hf_online", "local_snapshot"])
     parser.add_argument("--snapshot-root", type=Path, default=None)
+    parser.add_argument("--snapshot-fallback-root", type=Path, default=None)
     parser.add_argument("--cache-root", type=Path, default=None)
     parser.add_argument("--dataset-cache-limit-gib", type=int, default=50)
     parser.add_argument("--cache-free-space-floor-gib", type=int, default=0)
+    parser.add_argument("--checkpoint-retention-limit", type=int, default=0)
     parser.add_argument("--tokenizer-dir", type=Path, default=None)
     parser.add_argument("--tokenizer-workdir", type=Path, default=None)
     parser.add_argument("--max-cycle-minutes", type=int, default=350)
@@ -264,6 +299,14 @@ def main() -> int:
             kaggle_runtime=kaggle_runtime,
             requested_floor_gib=args.cache_free_space_floor_gib,
         )
+        snapshot_fallback_root = _resolve_snapshot_fallback_root(
+            kaggle_runtime=kaggle_runtime,
+            requested_root=args.snapshot_fallback_root,
+        )
+        checkpoint_retention_limit = _resolve_checkpoint_retention_limit(
+            kaggle_runtime=kaggle_runtime,
+            requested_limit=args.checkpoint_retention_limit,
+        )
         parallelism = _resolve_host_parallelism(kaggle_runtime=kaggle_runtime, args=args)
         _configure_cache_env(args.cache_root)
         _configure_host_parallelism_env(parallelism)
@@ -294,6 +337,7 @@ def main() -> int:
                         streaming_mode=args.streaming_mode,
                         cache_root=args.cache_root,
                         snapshot_root=args.snapshot_root,
+                        snapshot_fallback_root=snapshot_fallback_root,
                         tokenizer_dir=args.tokenizer_dir,
                         tokenizer_workdir=args.tokenizer_workdir,
                         host_cpu_threads=parallelism.host_cpu_threads,
@@ -304,6 +348,7 @@ def main() -> int:
                         max_segments=args.max_segments,
                         dataset_cache_limit_gib=args.dataset_cache_limit_gib,
                         cache_free_space_floor_gib=cache_free_space_floor_gib,
+                        checkpoint_retention_limit=checkpoint_retention_limit,
                         hf_token=args.hf_token,
                         runtime_lock_manifest_path=args.runtime_lock_manifest,
                         device=args.device,

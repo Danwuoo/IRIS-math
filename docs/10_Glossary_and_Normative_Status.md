@@ -48,25 +48,13 @@ Use these labels consistently.
 
 | Document | Status | Role |
 | --- | --- | --- |
-| `docs/13_Goals_and_Success_Criteria.md` | Active Companion Authority | Program goals, success surfaces, red-line failure criteria |
-| `docs/14_Multimodal_Document_Pipeline.md` | Active Companion Authority | Document-native pipeline, modality normalization, canonical anchors |
-| `docs/15_Benchmark_Registry_and_Tiering_Playbook.md` | Active Companion Authority | Benchmark family registry, tiering playbook, allowed and forbidden family uses |
-| `docs/16_Verifier_and_Formalization_Stack.md` | Active Companion Authority | Verifier stack roles, evidence classes, false accept / false reject policy |
-| `docs/17_Scaling_Promotion_and_Readiness.md` | Active Companion Authority | Capability-readiness promotion rules across profile families |
-| `docs/18_Optimization_and_Learning_Contract.md` | Active Companion Authority | Learning-objective families, curriculum activation, and level-addressable optimization contract |
-| `docs/19_Runtime_and_Task_Adjudication_Semantics.md` | Active Companion Authority | Runtime-cycle semantics, task-family adjudication, and terminal-status policy |
-
-### 2.4 Archive
-
-| Document | Status | Role |
-| --- | --- | --- |
-| `docs/11_Phase_D_Diagnostics_Design_Note.md` | Archive | Baseline Phase D note with legacy ARC-oriented semantics |
-| `docs/12_Phase_E_Execution_Design_Note.md` | Archive | Baseline Phase E note with legacy ARC/baseline execution assumptions |
-
-Archive notes may mention legacy `StateIR(T,G,O,R,X,M)` or ARC-specific semantics.
-They never override active v2 docs and must not be used as active State IR or benchmark authority.
-
----
+| `docs/11_Goals_and_Success_Criteria.md` | Active Companion Authority | Program goals, success surfaces, red-line failure criteria |
+| `docs/12_Multimodal_Document_Pipeline.md` | Active Companion Authority | Document-native pipeline, modality normalization, canonical anchors |
+| `docs/13_Benchmark_Registry_and_Tiering_Playbook.md` | Active Companion Authority | Benchmark family registry, tiering playbook, allowed and forbidden family uses |
+| `docs/14_Verifier_and_Formalization_Stack.md` | Active Companion Authority | Verifier stack roles, evidence classes, false accept / false reject policy |
+| `docs/15_Scaling_Promotion_and_Readiness.md` | Active Companion Authority | Capability-readiness promotion rules across profile families |
+| `docs/16_Optimization_and_Learning_Contract.md` | Active Companion Authority | Learning-objective families, curriculum activation, and level-addressable optimization contract |
+| `docs/17_Runtime_and_Task_Adjudication_Semantics.md` | Active Companion Authority | Runtime-cycle semantics, task-family adjudication, and terminal-status policy |
 
 ## 3. Transition Terms
 
@@ -137,6 +125,6 @@ They never override active v2 docs and must not be used as active State IR or be
 1. Active v2 docs override baseline implementation behavior.
 2. There is no separate active strategy-note authority above the active contract set; directional interpretation must come from the active contracts and companion docs.
 3. Active companion docs elaborate scoped authority and are binding within that scope.
-4. Archive docs never override active v2 docs and must not supply active `StateIR(T,G,O,R,X,M)` or ARC-specific semantics.
-5. Benchmark usage is governed by `docs/07_Data_Constitution.md` and `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, not by legacy blanket bans.
+4. Deleted archive docs do not define active authority; legacy `StateIR(T,G,O,R,X,M)` or ARC-specific semantics remain non-authoritative even when referenced historically.
+5. Benchmark usage is governed by `docs/07_Data_Constitution.md` and `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`, not by legacy blanket bans.
 6. `src/` may lag the docs during transition, but the lag must be explicit and temporary.

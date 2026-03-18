@@ -102,7 +102,7 @@ Rules:
 
 1. `state_ref` points to another State IR object or subfield and is the only compliant semantic cross-link shape.
 2. `scope_ref` is required anywhere scope matters. `scope_kind` must distinguish at least `problem_global`, `branch_local`, and `quote_local` when those cases occur.
-3. `anchor_ref.anchor_id` must resolve to the canonical anchor object governed by `docs/14_Multimodal_Document_Pipeline.md`.
+3. `anchor_ref.anchor_id` must resolve to the canonical anchor object governed by `docs/12_Multimodal_Document_Pipeline.md`.
 4. State IR stores anchor references, not duplicated full anchor payloads.
 
 ### 5.2 Field Obligation Classes
@@ -161,7 +161,7 @@ PF = {
 | `required_output.answer_channel` | `required_at_creation` | Natural-language proof, formula, program, formal statement, structured object, or mixed output |
 | `required_output.formality_level` | `deferred_allowed` | Informal, semi-formal, formal, or profile-specific equivalent |
 | `required_output.format_constraints` | `deferred_allowed` | Output shape restrictions such as exact value, bounded explanation, theorem-proof format, or theorem-formalization target |
-| `required_output.verifier_mode` | `deferred_allowed` | Verifier surface expected to judge success; it must resolve before terminal adjudication under `docs/19_Runtime_and_Task_Adjudication_Semantics.md` |
+| `required_output.verifier_mode` | `deferred_allowed` | Verifier surface expected to judge success; it must resolve before terminal adjudication under `docs/17_Runtime_and_Task_Adjudication_Semantics.md` |
 | `problem_assumptions[]` | `deferred_allowed` | May start empty, but the field itself must exist |
 | `domain_tags[]` | `deferred_allowed` | Algebra, geometry, number theory, analysis, combinatorics, or finer domain tags |
 | `source_anchor_refs[]` | `required_at_creation` | Must exist as a field; for document-grounded tasks the list may not be empty |
@@ -426,7 +426,7 @@ consistency_summary = {
 | Field | Obligation | Notes |
 | --- | --- | --- |
 | `vs_id` | `required_at_creation` | Stable verifier-entry id |
-| `evidence_class` | `required_at_creation` for `verifier_evidence` | Must align with `local_validity`, `gap`, `counterexample`, or `formal_bridge` evidence families from `docs/16_Verifier_and_Formalization_Stack.md` |
+| `evidence_class` | `required_at_creation` for `verifier_evidence` | Must align with `local_validity`, `gap`, `counterexample`, or `formal_bridge` evidence families from `docs/14_Verifier_and_Formalization_Stack.md` |
 | `summary_kind` | `required_at_creation` for `consistency_summary` | At minimum supports `branch_consistency` or `global_consistency` style summaries |
 | `target_ref` | `required_at_creation` | What the evidence or summary is about |
 | `verdict` | `required_at_creation` for `verifier_evidence` | Positive, negative, mixed, or profile-specific equivalent |
@@ -440,7 +440,7 @@ consistency_summary = {
 
 Rules:
 
-1. `VS` must keep evidence-class granularity aligned with `docs/16_Verifier_and_Formalization_Stack.md`.
+1. `VS` must keep evidence-class granularity aligned with `docs/14_Verifier_and_Formalization_Stack.md`.
 2. Consistency summaries may compress evidence for control or reporting, but they do not replace the underlying evidence objects.
 3. Verifier evidence without provenance is non-compliant.
 
@@ -501,7 +501,7 @@ adjudication_state = {
 | `budget_state.branch_expansion_budget_remaining` | `deferred_allowed` | Optional finer-grained search budget |
 | `budget_state.verifier_probe_budget_remaining` | `deferred_allowed` | Optional finer-grained verifier budget |
 | `budget_state.reparse_budget_remaining` | `deferred_allowed` | Optional finer-grained reparse budget |
-| `runtime_status` | `required_at_creation` | Must use one of `in_progress`, `candidate_ready`, `accepted`, `rejected`, `abstained`, `budget_exhausted` as governed by `docs/19_Runtime_and_Task_Adjudication_Semantics.md` |
+| `runtime_status` | `required_at_creation` | Must use one of `in_progress`, `candidate_ready`, `accepted`, `rejected`, `abstained`, `budget_exhausted` as governed by `docs/17_Runtime_and_Task_Adjudication_Semantics.md` |
 | `uncertainty_state` | `required_at_creation` | Controller-visible uncertainty or indecision state |
 | `escalation_state` | `required_at_creation` | Whether stronger verification, wider search, or abstention escalation is active |
 | `adjudication_state.task_adjudication_policy_id` | `deferred_allowed` | Required once terminal task adjudication is attempted |
@@ -526,7 +526,7 @@ Document parsers, OCR systems, formalizers, verifiers, and external tools do not
 They must first be normalized into:
 
 - canonical parse artifacts governed by `docs/07_Data_Constitution.md`,
-- canonical anchors governed by `docs/14_Multimodal_Document_Pipeline.md`,
+- canonical anchors governed by `docs/12_Multimodal_Document_Pipeline.md`,
 - State IR slot content governed by this document.
 
 State IR may retain anchor refs, provenance refs, and normalized summaries, but not raw unmanaged parser traces or tool logs.

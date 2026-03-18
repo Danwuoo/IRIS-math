@@ -82,24 +82,24 @@ Rationale:
 Mandatory docs consulted:
 - docs/00_INDEX.md
 - docs/10_Glossary_and_Normative_Status.md
-- docs/13_Goals_and_Success_Criteria.md
+- docs/11_Goals_and_Success_Criteria.md
 - docs/07_Data_Constitution.md
 - docs/01_Architecture_Constitution.md
 - docs/02_State_IR_Spec.md
 - docs/03_Level_Contracts_L0-L6.md
 - docs/04_Credit_Assignment_and_Recovery.md
-- docs/18_Optimization_and_Learning_Contract.md
-- docs/19_Runtime_and_Task_Adjudication_Semantics.md
+- docs/16_Optimization_and_Learning_Contract.md
+- docs/17_Runtime_and_Task_Adjudication_Semantics.md
 
 Policy docs consulted:
 - docs/05_Eval_Metrics_Spec.md
 - docs/06_Regression_and_Phase_Gates.md
 - docs/08_Training_Run_Governance.md
 - docs/09_Training_Profiles_and_Scaling.md
-- docs/14_Multimodal_Document_Pipeline.md
-- docs/15_Benchmark_Registry_and_Tiering_Playbook.md
-- docs/16_Verifier_and_Formalization_Stack.md
-- docs/17_Scaling_Promotion_and_Readiness.md
+- docs/12_Multimodal_Document_Pipeline.md
+- docs/13_Benchmark_Registry_and_Tiering_Playbook.md
+- docs/14_Verifier_and_Formalization_Stack.md
+- docs/15_Scaling_Promotion_and_Readiness.md
 
 Change class: capability_expansion
 Expected failure-category impact: reduces theory-layer ambiguity around F_ABS, F_SEARCH, and F_EVAL while preserving stable external F_* / L0-L6 / S1-S8 surfaces

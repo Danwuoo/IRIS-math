@@ -3,7 +3,7 @@
 **Document Type:** Canonical Binding Policy  
 **Audience:** Model, training, evaluation, parser, formalizer, and verifier pipelines  
 **Scope:** Canonical metric names, field semantics, and required metadata for IRIS-math v2  
-**Companion authority:** `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`, `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
+**Companion authority:** `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/14_Verifier_and_Formalization_Stack.md`, `docs/15_Scaling_Promotion_and_Readiness.md`, `docs/17_Runtime_and_Task_Adjudication_Semantics.md`
 
 ---
 
@@ -19,10 +19,10 @@ This document defines the canonical metrics vocabulary used to describe:
 
 This document defines **what is measured**, not which suites are active.
 Suite activation lives in `docs/06_Regression_and_Phase_Gates.md`.
-Benchmark-family-specific governance lives in `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
-Verifier evidence classes and false accept / false reject policy live in `docs/16_Verifier_and_Formalization_Stack.md`.
-Profile-readiness promotion claims live in `docs/17_Scaling_Promotion_and_Readiness.md`.
-Task-family acceptance and terminal adjudication semantics live in `docs/19_Runtime_and_Task_Adjudication_Semantics.md`.
+Benchmark-family-specific governance lives in `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`.
+Verifier evidence classes and false accept / false reject policy live in `docs/14_Verifier_and_Formalization_Stack.md`.
+Profile-readiness promotion claims live in `docs/15_Scaling_Promotion_and_Readiness.md`.
+Task-family acceptance and terminal adjudication semantics live in `docs/17_Runtime_and_Task_Adjudication_Semantics.md`.
 
 ---
 
@@ -56,7 +56,7 @@ Rules:
 
 - `task.success` must come from verifier logic interpreted through the active `task_adjudication_policy/v1` or an explicitly declared evaluation policy, not raw label lookup.
 - `task.confidence` must remain separable from correctness.
-- Any persisted accepted or rejected attempt must use the canonical `runtime_status` and `adjudication_status` vocabularies defined in `docs/19_Runtime_and_Task_Adjudication_Semantics.md`.
+- Any persisted accepted or rejected attempt must use the canonical `runtime_status` and `adjudication_status` vocabularies defined in `docs/17_Runtime_and_Task_Adjudication_Semantics.md`.
 
 ---
 

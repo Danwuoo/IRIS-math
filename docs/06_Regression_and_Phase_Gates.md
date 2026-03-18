@@ -3,7 +3,7 @@
 **Document Type:** Canonical Binding Workflow  
 **Metric Vocabulary Source:** `docs/05_Eval_Metrics_Spec.md`  
 **Scope:** Regression suites `S1-S8`, phase activation `A-E`, gate semantics, tolerance policy, required artifacts, and promotion criteria for IRIS-math v2  
-**Companion authority:** `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/16_Verifier_and_Formalization_Stack.md`, `docs/17_Scaling_Promotion_and_Readiness.md`, `docs/18_Optimization_and_Learning_Contract.md`, `docs/19_Runtime_and_Task_Adjudication_Semantics.md`
+**Companion authority:** `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`, `docs/14_Verifier_and_Formalization_Stack.md`, `docs/15_Scaling_Promotion_and_Readiness.md`, `docs/16_Optimization_and_Learning_Contract.md`, `docs/17_Runtime_and_Task_Adjudication_Semantics.md`
 
 ---
 
@@ -15,11 +15,11 @@ If a change improves aggregate score but violates an active regression gate, the
 
 The repository is in a documentation-first transition.
 Legacy ARC-family probes may still appear as compatibility signals, but they are not sufficient by themselves to define v2 readiness.
-Benchmark-family governance details live in `docs/15_Benchmark_Registry_and_Tiering_Playbook.md`.
-Verifier evidence policy lives in `docs/16_Verifier_and_Formalization_Stack.md`.
-Capability-readiness promotion between `P1-P4` lives in `docs/17_Scaling_Promotion_and_Readiness.md`.
-Learning-objective bundle semantics live in `docs/18_Optimization_and_Learning_Contract.md`.
-Task-family and terminal adjudication semantics live in `docs/19_Runtime_and_Task_Adjudication_Semantics.md`.
+Benchmark-family governance details live in `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`.
+Verifier evidence policy lives in `docs/14_Verifier_and_Formalization_Stack.md`.
+Capability-readiness promotion between `P1-P4` lives in `docs/15_Scaling_Promotion_and_Readiness.md`.
+Learning-objective bundle semantics live in `docs/16_Optimization_and_Learning_Contract.md`.
+Task-family and terminal adjudication semantics live in `docs/17_Runtime_and_Task_Adjudication_Semantics.md`.
 
 ---
 
