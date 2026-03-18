@@ -22,6 +22,51 @@ def _get_value(record: Mapping[str, Any], field: str) -> Any:
     return value
 
 
+def _text_field_candidates(source: DatasetSourceSpec) -> tuple[str, ...]:
+    candidates = [str(source.text_field).strip()]
+    metadata = source.metadata
+    for key in ("fallback_text_field", "secondary_field"):
+        value = str(metadata.get(key, "")).strip()
+        if value:
+            candidates.append(value)
+    extra_fields = metadata.get("text_field_candidates", [])
+    if isinstance(extra_fields, (list, tuple)):
+        for value in extra_fields:
+            normalized = str(value).strip()
+            if normalized:
+                candidates.append(normalized)
+    ordered = []
+    seen = set()
+    for candidate in candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        ordered.append(candidate)
+    return tuple(ordered)
+
+
+def _joined_text(source: DatasetSourceSpec, record: Mapping[str, Any]) -> str:
+    join_fields = source.metadata.get("text_join_fields", [])
+    if not isinstance(join_fields, (list, tuple)):
+        return ""
+    fragments = []
+    for field in join_fields:
+        normalized_field = str(field).strip()
+        if not normalized_field:
+            continue
+        text = _normalize_text(_to_text(_get_value(record, normalized_field)))
+        if text:
+            fragments.append(text)
+    return "\n\n".join(fragments)
+
+
+def _document_ingestion_config(source: DatasetSourceSpec) -> Mapping[str, Any]:
+    value = source.metadata.get("document_ingestion", {})
+    if not isinstance(value, Mapping):
+        return {}
+    return value
+
+
 def _to_text(value: Any) -> str:
     if value is None:
         return ""
@@ -49,6 +94,75 @@ def _normalize_text(text: str) -> str:
     return normalized
 
 
+def _document_paragraphs(text: str) -> list[str]:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return []
+    paragraphs = []
+    for block in re.split(r"\n\s*\n+", normalized):
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines:
+            continue
+        paragraphs.append(" ".join(lines))
+    return paragraphs
+
+
+def _truncate_chars(text: str, max_chars: int) -> str:
+    if max_chars <= 0 or len(text) <= max_chars:
+        return text
+    clipped = text[:max_chars]
+    last_space = clipped.rfind(" ")
+    if last_space >= max(int(max_chars * 0.7), 1):
+        clipped = clipped[:last_space]
+    return clipped.rstrip()
+
+
+def _candidate_texts(source: DatasetSourceSpec, text: str) -> tuple[str, ...]:
+    base_text = _normalize_text(text)
+    if not base_text:
+        return ()
+    candidates = [base_text]
+    config = _document_ingestion_config(source)
+    if str(config.get("mode", "")).strip().lower() != "paragraph_window":
+        return tuple(candidates)
+
+    paragraphs = _document_paragraphs(base_text)
+    if not paragraphs:
+        return tuple(candidates)
+
+    full_document = "\n\n".join(paragraphs)
+    if full_document and full_document != base_text:
+        candidates.append(full_document)
+
+    window = max(int(config.get("window_paragraphs", 8)), 1)
+    stride = max(int(config.get("stride_paragraphs", max(window // 2, 1))), 1)
+    min_chunk_chars = max(int(config.get("min_chunk_chars", 800)), 1)
+    max_chunk_chars = max(int(config.get("max_chunk_chars", 6000)), min_chunk_chars)
+
+    for start in range(0, len(paragraphs), stride):
+        chunk_parts: list[str] = []
+        for paragraph in paragraphs[start : start + window]:
+            if paragraph:
+                chunk_parts.append(paragraph)
+            merged = "\n\n".join(chunk_parts)
+            if len(merged) >= min_chunk_chars:
+                break
+        merged = "\n\n".join(chunk_parts)
+        merged = _truncate_chars(merged, max_chunk_chars)
+        if len(merged) >= min_chunk_chars:
+            candidates.append(merged)
+
+    ordered = []
+    seen = set()
+    for candidate in candidates:
+        normalized = _normalize_text(candidate)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        ordered.append(normalized)
+    return tuple(ordered)
+
+
 def _global_contamination_filter(text: str) -> bool:
     if len(text) < 24:
         return False
@@ -66,6 +180,14 @@ def _global_contamination_filter(text: str) -> bool:
 def _is_source_allowed(source: DatasetSourceSpec, record: Mapping[str, Any], text: str) -> bool:
     source_id = source.source_id
     metadata = source.metadata
+
+    required_source = str(metadata.get("required_source", "")).strip().lower()
+    if required_source:
+        actual_source = str(
+            record.get("source", record.get("dataset_source", ""))
+        ).strip().lower()
+        if actual_source and actual_source != required_source:
+            return False
 
     if source_id == "pes2o_s2orc":
         return str(record.get("source", "")).strip().lower() == str(
@@ -134,16 +256,28 @@ def _is_source_allowed(source: DatasetSourceSpec, record: Mapping[str, Any], tex
 
 
 def prepare_clean_text(source: DatasetSourceSpec, record: Mapping[str, Any]) -> str | None:
-    raw_text = _to_text(_get_value(record, source.text_field))
-    clean_text = _normalize_text(raw_text)
+    clean_text = _joined_text(source, record)
+    if not clean_text:
+        clean_text = ""
+    for field in _text_field_candidates(source):
+        if clean_text:
+            break
+        raw_text = _to_text(_get_value(record, field))
+        clean_text = _normalize_text(raw_text)
     if not clean_text:
         return None
-    if not _global_contamination_filter(clean_text):
-        return None
-    if not _is_source_allowed(source, record, clean_text):
-        return None
-    try:
-        enforce_qa_gate(clean_text)
-    except ValueError:
-        return None
-    return clean_text
+
+    for candidate_text in _candidate_texts(source, clean_text):
+        if not _global_contamination_filter(candidate_text):
+            continue
+        if not _is_source_allowed(source, record, candidate_text):
+            continue
+        try:
+            enforce_qa_gate(
+                candidate_text,
+                profile=str(source.metadata.get("qa_gate_profile", "default")),
+            )
+        except ValueError:
+            continue
+        return candidate_text
+    return None

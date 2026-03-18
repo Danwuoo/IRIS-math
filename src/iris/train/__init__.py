@@ -31,6 +31,22 @@ from .data import (
 )
 from .data.iterator import PureLMStreamingProvider
 from .data.token_accounting import TokenizerError, load_tokenizer_handle
+from .hf_sync import (
+    HFRepoSpec,
+    HFSyncError,
+    bootstrap_checkpoint_run,
+    read_latest_pointer,
+    resolve_dataset_commit_sha,
+    sync_checkpoint_run,
+    sync_final_release,
+    write_latest_pointer,
+)
+from .iris3b_config import (
+    IRIS3BConfig,
+    InterleavedLevelPlacement,
+    default_iris3b_config,
+    iris3b_config_from_mapping,
+)
 from .objectives import (
     LEARNING_OBJECTIVE_BUNDLE_RESOLUTION_SOURCES,
     LearningObjectiveBundle,
@@ -50,10 +66,15 @@ __all__ = [
     "DataRealizationPolicy",
     "DatasetSourceSpec",
     "DecontamPolicy",
+    "HFRepoSpec",
+    "HFSyncError",
+    "IRIS3BConfig",
+    "InterleavedLevelPlacement",
     "LEARNING_OBJECTIVE_BUNDLE_RESOLUTION_SOURCES",
     "LearningObjectiveBundle",
     "LearningObjectiveValidationError",
     "ObjectiveFamilyActivation",
+    "P1TrainConfig",
     "P1RecordAdmission",
     "PolicyValidationError",
     "ProfileValidationError",
@@ -64,9 +85,12 @@ __all__ = [
     "ToyTrainConfig",
     "TrainVisibleRecord",
     "admit_p1_train_visible_record",
+    "bootstrap_checkpoint_run",
     "build_document_pipeline_bundle",
     "build_document_slice_id",
+    "default_iris3b_config",
     "evaluate_latest_run",
+    "export_final_release",
     "load_default_policy_bundle",
     "load_default_pure_lm_profile",
     "load_aimo3_local_dataset",
@@ -77,16 +101,26 @@ __all__ = [
     "load_policy_bundle_for_profile_phase",
     "load_profile",
     "load_tokenizer_handle",
+    "iris3b_config_from_mapping",
+    "read_latest_pointer",
     "profile_sha256",
+    "resolve_dataset_commit_sha",
     "resolve_learning_objective_bundle",
+    "run_p1_training_cycle",
     "run_toy_training",
+    "sync_checkpoint_run",
+    "sync_final_release",
     "sources_manifest_sha256",
     "validate_train_visible_record",
+    "write_latest_pointer",
 ]
 
 _OPTIONAL_EXPORTS = {
+    "P1TrainConfig": ("iris.train.iris3b_training", "P1TrainConfig"),
     "ToyTrainConfig": ("iris.train.loop", "ToyTrainConfig"),
     "run_toy_training": ("iris.train.loop", "run_toy_training"),
+    "run_p1_training_cycle": ("iris.train.iris3b_training", "run_p1_training_cycle"),
+    "export_final_release": ("iris.train.iris3b_training", "export_final_release"),
     "evaluate_latest_run": ("iris.train.eval", "evaluate_latest_run"),
 }
 

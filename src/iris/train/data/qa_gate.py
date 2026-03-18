@@ -4,6 +4,22 @@ import re
 from typing import Any, Dict, List, Mapping
 
 _CONTROL_PATTERN = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+_QA_PROFILES: Dict[str, Dict[str, float]] = {
+    "default": {
+        "max_control_char_ratio": 0.02,
+        "max_repetition_rate": 0.20,
+        "min_avg_line_length": 20.0,
+        "max_line_break_density": 0.08,
+        "min_language_signal_ratio": 0.10,
+    },
+    "document_relaxed": {
+        "max_control_char_ratio": 0.02,
+        "max_repetition_rate": 0.35,
+        "min_avg_line_length": 8.0,
+        "max_line_break_density": 0.18,
+        "min_language_signal_ratio": 0.08,
+    },
+}
 
 
 def _control_char_ratio(text: str) -> float:
@@ -48,47 +64,57 @@ def _language_signal_ratio(text: str) -> float:
     return float(alphabetic) / float(printable)
 
 
-def evaluate_text_quality(text: str) -> Dict[str, Any]:
+def _resolve_profile(profile: str | None) -> Dict[str, float]:
+    normalized = str(profile or "default").strip().lower() or "default"
+    return dict(_QA_PROFILES.get(normalized, _QA_PROFILES["default"]))
+
+
+def evaluate_text_quality(text: str, *, profile: str | None = None) -> Dict[str, Any]:
+    thresholds = _resolve_profile(profile)
     metrics: Dict[str, Any] = {}
     reasons: List[str] = []
 
     control_ratio = _control_char_ratio(text)
     metrics["control_char_ratio"] = control_ratio
-    if control_ratio > 0.02:
+    if control_ratio > float(thresholds["max_control_char_ratio"]):
         reasons.append(
-            f"control/non-printable ratio {control_ratio:.4f} exceeds 0.02"
+            f"control/non-printable ratio {control_ratio:.4f} exceeds {thresholds['max_control_char_ratio']:.2f}"
         )
 
     repetition = _repetition_rate(text)
     metrics["repetition_rate"] = repetition
-    if repetition > 0.20:
+    if repetition > float(thresholds["max_repetition_rate"]):
         reasons.append(
-            f"repetition rate {repetition:.4f} exceeds 0.20"
+            f"repetition rate {repetition:.4f} exceeds {thresholds['max_repetition_rate']:.2f}"
         )
 
     frag = _fragmentation_metrics(text)
     metrics.update(frag)
-    if frag["avg_line_length"] < 20.0 and frag["line_break_density"] > 0.08:
+    if (
+        frag["avg_line_length"] < float(thresholds["min_avg_line_length"])
+        and frag["line_break_density"] > float(thresholds["max_line_break_density"])
+    ):
         reasons.append(
             "severe fragmentation detected (short lines with high line-break density)"
         )
 
     language_signal = _language_signal_ratio(text)
     metrics["language_signal_ratio"] = language_signal
-    if language_signal < 0.10:
+    if language_signal < float(thresholds["min_language_signal_ratio"]):
         reasons.append(
-            f"language signal ratio {language_signal:.4f} below 0.10"
+            f"language signal ratio {language_signal:.4f} below {thresholds['min_language_signal_ratio']:.2f}"
         )
 
     return {
         "pass": not reasons,
+        "profile": str(profile or "default"),
         "metrics": metrics,
         "reasons": reasons,
     }
 
 
-def enforce_qa_gate(text: str) -> Dict[str, Any]:
-    report = evaluate_text_quality(text)
+def enforce_qa_gate(text: str, *, profile: str | None = None) -> Dict[str, Any]:
+    report = evaluate_text_quality(text, profile=profile)
     if not report["pass"]:
         raise ValueError("Data QA gate failed: " + "; ".join(report["reasons"]))
     return report

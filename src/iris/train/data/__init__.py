@@ -29,6 +29,14 @@ from .contracts import (
     sources_manifest_sha256,
 )
 from .iterator import PureLMStreamingProvider, SourceManifest, TextBatch, deterministic_sampling_key
+from .p1_iterator import (
+    P1Batch,
+    P1BatchPlan,
+    P1SegmentPlan,
+    P1SourceManifest,
+    P1StreamingProvider,
+    deterministic_p1_sampling_key,
+)
 from .planner import HybridSchedule, MicroStepPlan, SegmentPlan, build_hybrid_schedule, build_pure_lm_segment_plan
 from .qa_gate import enforce_qa_gate, evaluate_text_quality
 from .document_records import (
@@ -44,6 +52,16 @@ from .document_records import (
     validate_math_document_source,
 )
 from .document_pipeline import DocumentPipelineBundle, DocumentPipelineError, build_document_pipeline_bundle
+from .p1_manifest import (
+    P1ManifestValidationError,
+    P1StreamingManifest,
+    P1StreamingSource,
+    load_default_p1_streaming_manifest,
+    load_p1_streaming_manifest,
+    manifest_sha256 as p1_manifest_sha256,
+    resolve_manifest_revisions,
+    validate_manifest as validate_p1_streaming_manifest,
+)
 from .state_builder import text_to_state_ir
 from .token_accounting import (
     TokenLedger,
@@ -74,7 +92,15 @@ __all__ = [
     "MathDocumentRecord",
     "MathDocumentSource",
     "MicroStepPlan",
+    "P1ManifestValidationError",
+    "P1Batch",
+    "P1BatchPlan",
     "P1RecordAdmission",
+    "P1SegmentPlan",
+    "P1SourceManifest",
+    "P1StreamingManifest",
+    "P1StreamingProvider",
+    "P1StreamingSource",
     "PolicyValidationError",
     "PURE_LM_RATIO_TOTAL",
     "ProvenanceManifest",
@@ -96,9 +122,11 @@ __all__ = [
     "build_pure_lm_segment_plan",
     "count_tokens",
     "deterministic_sampling_key",
+    "deterministic_p1_sampling_key",
     "enforce_qa_gate",
     "evaluate_text_quality",
     "load_default_policy_bundle",
+    "load_default_p1_streaming_manifest",
     "load_default_pure_lm_profile",
     "load_aimo3_local_dataset",
     "load_math_document_projection",
@@ -107,13 +135,17 @@ __all__ = [
     "load_policy_bundle",
     "load_policy_bundle_for_profile",
     "load_policy_bundle_for_profile_phase",
+    "load_p1_streaming_manifest",
     "load_profile",
     "load_tokenizer_handle",
+    "p1_manifest_sha256",
     "profile_sha256",
+    "resolve_manifest_revisions",
     "sources_manifest_sha256",
     "text_to_state_ir",
     "tokenizer_fingerprint",
     "truncate_text_to_tokens",
+    "validate_p1_streaming_manifest",
     "validate_math_document_projection",
     "validate_math_document_record",
     "validate_math_document_source",
