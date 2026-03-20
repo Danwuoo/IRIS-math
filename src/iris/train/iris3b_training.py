@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, Mapping
@@ -40,6 +42,7 @@ from .journal import APPLIED, PENDING, append_journal_event, journal_head_hash, 
 from .tokenizer_pipeline import TokenizerArtifact, TokenizerBuildConfig, train_sentencepiece_tokenizer
 
 _LEVEL_IDS = tuple(f"L{index}" for index in range(7))
+_CHECKPOINT_PAYLOAD_COMPONENTS = ("params", "optimizer_state", "rng_state")
 # TEMPORARY TECHNICAL DEBT: reserve a fixed write tail beyond the estimated
 # checkpoint payload so low-headroom Kaggle disks can still append journal and
 # manifest metadata during checkpoint commit. Remove once runtime storage
@@ -141,23 +144,126 @@ def _estimate_tree_bytes(tree: Any) -> int:
     return sum(_estimate_leaf_bytes(leaf) for leaf in leaves)
 
 
+def _estimate_checkpoint_payload_component_bytes(
+    *,
+    params: Any,
+    opt_state: Any,
+    rng_state: Mapping[str, Any],
+) -> Dict[str, int]:
+    return {
+        "params": int(_estimate_tree_bytes(params)),
+        "optimizer_state": int(_estimate_tree_bytes(opt_state)),
+        "rng_state": int(_estimate_tree_bytes(dict(rng_state))),
+    }
+
+
 def _estimate_checkpoint_payload_bytes(*, params: Any, opt_state: Any, rng_state: Mapping[str, Any]) -> int:
     return int(
-        _estimate_tree_bytes(params)
-        + _estimate_tree_bytes(opt_state)
-        + _estimate_tree_bytes(dict(rng_state))
+        sum(
+            _estimate_checkpoint_payload_component_bytes(
+                params=params,
+                opt_state=opt_state,
+                rng_state=rng_state,
+            ).values()
+        )
     )
 
 
-def _enforce_cache_budget(config: "P1TrainConfig", *, reserve_bytes: int = 0) -> Dict[str, object]:
+def _filesystem_device_id(path: Path | None) -> int | None:
+    if path is None:
+        return None
+    try:
+        return int(os.stat(path).st_dev)
+    except OSError:
+        return None
+
+
+def _free_bytes(path: Path | None) -> int:
+    if path is None:
+        return 0
+    try:
+        return int(shutil.disk_usage(path).free)
+    except OSError:
+        return 0
+
+
+def _checkpoint_payload_root_map_for_config(
+    config: "P1TrainConfig",
+    *,
+    checkpoints_dir: Path,
+) -> Dict[str, Path]:
+    default_root = (
+        Path(config.checkpoint_payload_root)
+        if config.checkpoint_payload_root is not None
+        else (Path(checkpoints_dir) / "payloads")
+    )
+    payload_root_map = {
+        "params": default_root,
+        "optimizer_state": default_root,
+        "rng_state": default_root,
+    }
+    overrides = {
+        "params": config.checkpoint_params_root,
+        "optimizer_state": config.checkpoint_optimizer_root,
+        "rng_state": config.checkpoint_rng_root,
+    }
+    for component, root in overrides.items():
+        if root is None:
+            continue
+        payload_root_map[component] = Path(root)
+    return payload_root_map
+
+
+def _unique_checkpoint_payload_roots(payload_root_map: Mapping[str, Path]) -> tuple[Path, ...]:
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for component in _CHECKPOINT_PAYLOAD_COMPONENTS:
+        root = Path(payload_root_map[component])
+        key = str(root.resolve(strict=False))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(root)
+    return tuple(unique)
+
+
+def _checkpoint_payload_bytes_by_root(
+    *,
+    payload_root_map: Mapping[str, Path],
+    component_bytes: Mapping[str, int],
+) -> Dict[Path, int]:
+    root_bytes: Dict[Path, int] = {}
+    for component in _CHECKPOINT_PAYLOAD_COMPONENTS:
+        root = Path(payload_root_map[component])
+        root_bytes[root] = int(root_bytes.get(root, 0)) + int(component_bytes.get(component, 0))
+    return root_bytes
+
+
+def _enforce_cache_budget(
+    config: "P1TrainConfig",
+    *,
+    checkpoint_payload_roots: tuple[Path, ...] = (),
+    reserve_bytes_by_root: Mapping[Path, int] | None = None,
+) -> Dict[str, object]:
     budget_gib = int(max(config.dataset_cache_limit_gib, 0))
     configured_floor_bytes = gib_to_bytes(int(max(config.cache_free_space_floor_gib, 0)))
-    write_reserve_bytes = int(max(reserve_bytes, 0))
+    normalized_reserve_bytes_by_root = {
+        Path(root): int(max(bytes_reserved, 0))
+        for root, bytes_reserved in dict(reserve_bytes_by_root or {}).items()
+        if int(max(bytes_reserved, 0)) > 0
+    }
     effective_min_free_bytes = int(configured_floor_bytes)
-    if write_reserve_bytes > 0:
+    output_device_id = _filesystem_device_id(Path(config.output_dir))
+    same_device_reserve_bytes = 0
+    for checkpoint_root, bytes_reserved in normalized_reserve_bytes_by_root.items():
+        checkpoint_device_id = _filesystem_device_id(checkpoint_root)
+        if checkpoint_device_id is None or output_device_id is None or checkpoint_device_id != output_device_id:
+            continue
+        same_device_reserve_bytes += int(bytes_reserved)
+    if same_device_reserve_bytes > 0:
         effective_min_free_bytes = max(
             effective_min_free_bytes,
-            int(write_reserve_bytes) + int(_CHECKPOINT_WRITE_MARGIN_BYTES),
+            int(same_device_reserve_bytes) + int(_CHECKPOINT_WRITE_MARGIN_BYTES),
         )
     summary = enforce_dataset_cache_budget(
         roots=(config.cache_root, config.snapshot_root, config.snapshot_fallback_root),
@@ -173,8 +279,130 @@ def _enforce_cache_budget(config: "P1TrainConfig", *, reserve_bytes: int = 0) ->
         ),
     )
     summary["configured_free_space_floor_bytes"] = int(configured_floor_bytes)
-    summary["checkpoint_write_reserve_bytes"] = int(write_reserve_bytes)
+    summary["checkpoint_write_reserve_bytes"] = int(sum(normalized_reserve_bytes_by_root.values()))
+    summary["checkpoint_write_reserve_bytes_same_device"] = int(same_device_reserve_bytes)
+    summary["checkpoint_write_reserve_bytes_by_root"] = {
+        str(root): int(bytes_reserved)
+        for root, bytes_reserved in normalized_reserve_bytes_by_root.items()
+    }
+    summary["checkpoint_payload_roots"] = [str(root) for root in checkpoint_payload_roots]
     return summary
+
+
+def _event_time_seconds(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        return float(datetime.fromisoformat(text).timestamp())
+    except ValueError:
+        return None
+
+
+def _segment_wall_times_from_events(events: list[Dict[str, Any]]) -> list[float]:
+    pending_times: dict[int, float] = {}
+    wall_times: list[float] = []
+    for event in events:
+        status = str(event.get("status", "")).upper()
+        segment_id = int(event.get("segment_id", -1))
+        event_seconds = _event_time_seconds(event.get("event_time"))
+        if segment_id < 0 or event_seconds is None:
+            continue
+        if status == PENDING:
+            pending_times[segment_id] = event_seconds
+            continue
+        if status != APPLIED:
+            continue
+        pending_seconds = pending_times.get(segment_id)
+        if pending_seconds is None:
+            continue
+        elapsed_seconds = float(event_seconds - pending_seconds)
+        if elapsed_seconds >= 0.0:
+            wall_times.append(elapsed_seconds)
+    return wall_times
+
+
+def _estimate_next_segment_wall_time_seconds(segment_wall_times: list[float]) -> float:
+    if not segment_wall_times:
+        return 0.0
+    trailing = [float(value) for value in segment_wall_times[-3:] if float(value) > 0.0]
+    if not trailing:
+        return 0.0
+    baseline_seconds = max(max(trailing), float(sum(trailing) / len(trailing)))
+    # TEMPORARY TECHNICAL DEBT: inflate observed segment wall time with a fixed
+    # safety factor so Kaggle cycles stop before launching a segment that is
+    # unlikely to finish inside the governed wall-clock budget. Remove once
+    # runtime pacing is backed by artifact-aware telemetry instead of this
+    # deterministic fallback.
+    # Intended replacement: runtime-aware learned pacing for segment admission.
+    return baseline_seconds * 1.15
+
+
+def _checkpoint_payload_space_status(
+    checkpoint_payload_bytes_by_root: Mapping[Path, int],
+) -> list[Dict[str, object]]:
+    status_rows: list[Dict[str, object]] = []
+    for checkpoint_root, estimated_payload_bytes in checkpoint_payload_bytes_by_root.items():
+        required_free_bytes = int(max(estimated_payload_bytes, 0)) + int(_CHECKPOINT_WRITE_MARGIN_BYTES)
+        free_bytes = _free_bytes(checkpoint_root)
+        status_rows.append(
+            {
+                "root": str(checkpoint_root),
+                "free_bytes": int(free_bytes),
+                "required_free_bytes": int(required_free_bytes),
+                "estimated_payload_bytes": int(max(estimated_payload_bytes, 0)),
+            }
+        )
+    return status_rows
+
+
+def _require_checkpoint_commit_headroom(
+    *,
+    config: "P1TrainConfig",
+    checkpoint_payload_roots: tuple[Path, ...],
+    checkpoint_payload_bytes_by_root: Mapping[Path, int],
+    checkpoint_stage: str,
+) -> Dict[str, object]:
+    cache_budget_summary = _enforce_cache_budget(
+        config,
+        checkpoint_payload_roots=checkpoint_payload_roots,
+        reserve_bytes_by_root=checkpoint_payload_bytes_by_root,
+    )
+    required_free_bytes = int(cache_budget_summary.get("free_space_floor_bytes", 0))
+    free_bytes_after = int(cache_budget_summary.get("free_bytes_after", 0))
+    if required_free_bytes > 0 and free_bytes_after < required_free_bytes:
+        raise RuntimeError(
+            f"Insufficient disk headroom to commit the {checkpoint_stage} checkpoint payload: "
+            f"free_bytes_after={free_bytes_after}, "
+            f"required_free_bytes={required_free_bytes}, "
+            f"estimated_checkpoint_payload_bytes={sum(int(value) for value in checkpoint_payload_bytes_by_root.values())}, "
+            f"checkpoint_retention_limit={int(config.checkpoint_retention_limit)}. "
+            "Either increase writable disk capacity, reduce checkpoint payload size, "
+            "or place checkpoints on a roomier volume."
+        )
+    checkpoint_space_status = _checkpoint_payload_space_status(checkpoint_payload_bytes_by_root)
+    insufficient_roots = [
+        status
+        for status in checkpoint_space_status
+        if int(status.get("required_free_bytes", 0)) > int(status.get("free_bytes", 0))
+    ]
+    if insufficient_roots:
+        details = ", ".join(
+            (
+                f"root={status['root']}, "
+                f"free_bytes={int(status['free_bytes'])}, "
+                f"required_free_bytes={int(status['required_free_bytes'])}"
+            )
+            for status in insufficient_roots
+        )
+        raise RuntimeError(
+            f"Insufficient free space on the checkpoint payload volume to commit the {checkpoint_stage} checkpoint payload: "
+            f"{details}."
+        )
+    cache_budget_summary["checkpoint_payload_space_status"] = checkpoint_space_status
+    return cache_budget_summary
 
 
 def _load_committed_manifest(config: "P1TrainConfig") -> tuple[P1StreamingManifest, Path]:
@@ -287,8 +515,23 @@ def _prepare_tokenizer(
         ),
     )
     if handle_path.resolve() != artifact.tokenizer_dir.resolve():
+        source_dir = artifact.tokenizer_dir
+        source_manifest_path = artifact.manifest_path
+        source_workdir = source_dir.parent
         shutil.rmtree(handle_path, ignore_errors=True)
-        shutil.copytree(artifact.tokenizer_dir, handle_path)
+        shutil.copytree(source_dir, handle_path)
+        artifact = TokenizerArtifact(
+            tokenizer_dir=handle_path,
+            manifest_path=handle_path / source_manifest_path.name,
+            tokenizer_manifest_id=artifact.tokenizer_manifest_id,
+            tokenizer_manifest_sha256=artifact.tokenizer_manifest_sha256,
+        )
+        shutil.rmtree(source_dir, ignore_errors=True)
+        (source_workdir / "tokenizer_corpus.txt").unlink(missing_ok=True)
+        try:
+            source_workdir.rmdir()
+        except OSError:
+            pass
     handle = load_tokenizer_handle(str(handle_path))
     return handle, artifact, handle_path
 
@@ -382,10 +625,17 @@ class P1TrainConfig:
     tokenizer_corpus_workers: int = 1
     sentencepiece_threads: int = 1
     max_cycle_minutes: int = 350
+    cycle_deadline_monotonic: float | None = None
+    cycle_sync_reserve_minutes: float = 0.0
+    segment_guard_minutes: float = 0.0
     max_segments: int = 10_000
     dataset_cache_limit_gib: int = 50
     cache_free_space_floor_gib: int = 0
     checkpoint_retention_limit: int = 0
+    checkpoint_payload_root: Path | None = None
+    checkpoint_params_root: Path | None = None
+    checkpoint_optimizer_root: Path | None = None
+    checkpoint_rng_root: Path | None = None
     hf_token: str | None = None
     runtime_lock_manifest_path: Path | None = None
     crash_point: str = "none"
@@ -422,10 +672,22 @@ class P1TrainConfig:
             "tokenizer_corpus_workers": int(self.tokenizer_corpus_workers),
             "sentencepiece_threads": int(self.sentencepiece_threads),
             "max_cycle_minutes": int(self.max_cycle_minutes),
+            "cycle_sync_reserve_minutes": float(self.cycle_sync_reserve_minutes),
+            "segment_guard_minutes": float(self.segment_guard_minutes),
             "max_segments": int(self.max_segments),
             "dataset_cache_limit_gib": int(self.dataset_cache_limit_gib),
             "cache_free_space_floor_gib": int(self.cache_free_space_floor_gib),
             "checkpoint_retention_limit": int(self.checkpoint_retention_limit),
+            "checkpoint_payload_root": (
+                str(self.checkpoint_payload_root) if self.checkpoint_payload_root is not None else None
+            ),
+            "checkpoint_payload_roots": {
+                "params": str(self.checkpoint_params_root) if self.checkpoint_params_root is not None else None,
+                "optimizer_state": (
+                    str(self.checkpoint_optimizer_root) if self.checkpoint_optimizer_root is not None else None
+                ),
+                "rng_state": str(self.checkpoint_rng_root) if self.checkpoint_rng_root is not None else None,
+            },
             "runtime_lock_manifest_path": (
                 str(self.runtime_lock_manifest_path) if self.runtime_lock_manifest_path is not None else None
             ),
@@ -446,10 +708,28 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
 
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    deadline = (
+        float(config.cycle_deadline_monotonic)
+        if config.cycle_deadline_monotonic is not None
+        else (time.monotonic() + (max(float(config.max_cycle_minutes), 1.0) * 60.0))
+    )
+    sync_reserve_seconds = max(float(config.cycle_sync_reserve_minutes), 0.0) * 60.0
+    segment_guard_seconds = max(float(config.segment_guard_minutes), 0.0) * 60.0
     checkpoints_dir = output_dir / "checkpoints"
+    checkpoint_payload_root_map = _checkpoint_payload_root_map_for_config(
+        config,
+        checkpoints_dir=checkpoints_dir,
+    )
+    checkpoint_payload_roots = _unique_checkpoint_payload_roots(checkpoint_payload_root_map)
+    for checkpoint_payload_root in checkpoint_payload_roots:
+        checkpoint_payload_root.mkdir(parents=True, exist_ok=True)
+    legacy_checkpoint_payload_root = checkpoint_payload_roots[0] if len(checkpoint_payload_roots) == 1 else None
     journal_path = output_dir / "segment_journal.jsonl"
     metrics_path = output_dir / "metrics.jsonl"
-    cache_budget_summary = _enforce_cache_budget(config)
+    cache_budget_summary = _enforce_cache_budget(
+        config,
+        checkpoint_payload_roots=checkpoint_payload_roots,
+    )
 
     runtime_lock = write_runtime_lock_manifest(
         output_dir=output_dir,
@@ -461,7 +741,10 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
     config_hash = stable_hash(config.as_payload())
     manifest, committed_manifest_path = _load_committed_manifest(config)
     tokenizer_handle, tokenizer_artifact, tokenizer_root = _prepare_tokenizer(config=config, manifest=manifest)
-    cache_budget_summary = _enforce_cache_budget(config)
+    cache_budget_summary = _enforce_cache_budget(
+        config,
+        checkpoint_payload_roots=checkpoint_payload_roots,
+    )
     snapshot_manifest_path = _local_snapshot_manifest(
         manifest,
         config.snapshot_root,
@@ -483,18 +766,26 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
         aux_target_dim=model_config.aux_target_dim,
         state_target_hidden_dim=model_config.state_target_hidden_dim,
     )
-    cache_budget_summary = _enforce_cache_budget(config)
+    cache_budget_summary = _enforce_cache_budget(
+        config,
+        checkpoint_payload_roots=checkpoint_payload_roots,
+    )
     source_manifest = provider.source_manifest
 
     events = load_journal(journal_path)
     next_segment, last_applied, pending_event = resolve_resume_pointer(events)
     last_applied_segment_id = int(last_applied.get("segment_id", -1)) if last_applied is not None else -1
+    observed_segment_wall_times = _segment_wall_times_from_events(events)
     checkpoint_retention_summary: Dict[str, Any] = prune_checkpoint_payloads(
         checkpoint_dir=checkpoints_dir,
         keep_last=int(max(config.checkpoint_retention_limit, 0)),
         keep_segment_ids=_checkpoint_keep_segment_ids(last_applied_segment_id),
+        payload_roots=checkpoint_payload_root_map,
     )
-    cache_budget_summary = _enforce_cache_budget(config)
+    cache_budget_summary = _enforce_cache_budget(
+        config,
+        checkpoint_payload_roots=checkpoint_payload_roots,
+    )
     optimizer = _optimizer_for_config(optax, model_config)
     grad_fn, accumulate_grads, apply_grads = _train_functions(model_config, optimizer)
 
@@ -511,8 +802,19 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
         "rng.data.train": int(config.data_seed),
     }
 
+    last_checkpoint_manifest_path: Path | None = None
+    last_checkpoint_payload_ref = ""
+    last_estimated_checkpoint_component_bytes: Dict[str, int] = {
+        component: 0 for component in _CHECKPOINT_PAYLOAD_COMPONENTS
+    }
+    last_estimated_checkpoint_payload_root_bytes: Dict[Path, int] = {}
+    last_estimated_checkpoint_payload_bytes = 0
     if last_applied is not None:
-        checkpoint = load_iris3b_checkpoint(output_dir / str(last_applied["checkpoint_ref"]))
+        last_checkpoint_manifest_path = output_dir / str(last_applied["checkpoint_ref"])
+        checkpoint = load_iris3b_checkpoint(
+            last_checkpoint_manifest_path,
+            payload_roots=checkpoint_payload_root_map,
+        )
         if checkpoint.get("model_state") is not None:
             raise RuntimeError(
                 "Legacy toy checkpoints are not compatible with the IRIS 3B trainer."
@@ -521,25 +823,92 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
         opt_state = checkpoint["opt_state"]
         rng_state = dict(checkpoint["rng_state"])
         optimizer_step_id = int(checkpoint.get("optimizer_step_id_last_applied", 0))
-        cache_budget_summary = _enforce_cache_budget(config)
+        last_checkpoint_payload_ref = str(
+            checkpoint.get("checkpoint_payload_ref", last_applied.get("checkpoint_payload_ref", ""))
+        )
+        last_estimated_checkpoint_component_bytes = _estimate_checkpoint_payload_component_bytes(
+            params=params,
+            opt_state=opt_state,
+            rng_state=rng_state,
+        )
+        last_estimated_checkpoint_payload_root_bytes = _checkpoint_payload_bytes_by_root(
+            payload_root_map=checkpoint_payload_root_map,
+            component_bytes=last_estimated_checkpoint_component_bytes,
+        )
+        last_estimated_checkpoint_payload_bytes = int(sum(last_estimated_checkpoint_component_bytes.values()))
+        cache_budget_summary = _enforce_cache_budget(
+            config,
+            checkpoint_payload_roots=checkpoint_payload_roots,
+        )
+    else:
+        last_estimated_checkpoint_component_bytes = _estimate_checkpoint_payload_component_bytes(
+            params=params,
+            opt_state=opt_state,
+            rng_state=rng_state,
+        )
+        last_estimated_checkpoint_payload_root_bytes = _checkpoint_payload_bytes_by_root(
+            payload_root_map=checkpoint_payload_root_map,
+            component_bytes=last_estimated_checkpoint_component_bytes,
+        )
+        last_estimated_checkpoint_payload_bytes = int(sum(last_estimated_checkpoint_component_bytes.values()))
+        cache_budget_summary = _require_checkpoint_commit_headroom(
+            config=config,
+            checkpoint_payload_roots=checkpoint_payload_roots,
+            checkpoint_payload_bytes_by_root=last_estimated_checkpoint_payload_root_bytes,
+            checkpoint_stage="initial",
+        )
 
     effective_resume_path = config.resume_path_id
     if pending_event is not None and config.resume_path_id == "uninterrupted":
         effective_resume_path = "execute_crash"
 
-    deadline = time.monotonic() + max(int(config.max_cycle_minutes), 1) * 60.0
-    last_checkpoint_manifest_path: Path | None = None
-    last_checkpoint_payload_ref = ""
-    last_estimated_checkpoint_payload_bytes = 0
     last_dataset_slice_id = ""
     last_plan_hash = ""
     last_batch = None
     segments_completed = 0
+    termination_reason = "max_segments_reached"
 
     for segment_id in range(next_segment, next_segment + max(int(config.max_segments), 0)):
-        if time.monotonic() >= deadline and segments_completed > 0:
+        remaining_seconds = float(deadline - time.monotonic())
+        estimated_next_segment_seconds = _estimate_next_segment_wall_time_seconds(observed_segment_wall_times)
+        minimum_required_seconds = sync_reserve_seconds + segment_guard_seconds
+        if remaining_seconds <= sync_reserve_seconds:
+            termination_reason = "sync_reserve_reached"
             break
-        cache_budget_summary = _enforce_cache_budget(config)
+        if remaining_seconds < minimum_required_seconds:
+            termination_reason = "segment_guard_stop"
+            break
+        if estimated_next_segment_seconds > 0.0 and remaining_seconds < (
+            sync_reserve_seconds + segment_guard_seconds + estimated_next_segment_seconds
+        ):
+            termination_reason = "segment_guard_stop"
+            break
+        if last_checkpoint_manifest_path is not None and last_estimated_checkpoint_payload_root_bytes:
+            guard_cache_budget_summary = _enforce_cache_budget(
+                config,
+                checkpoint_payload_roots=checkpoint_payload_roots,
+                reserve_bytes_by_root=last_estimated_checkpoint_payload_root_bytes,
+            )
+            checkpoint_space_status = _checkpoint_payload_space_status(last_estimated_checkpoint_payload_root_bytes)
+            insufficient_roots = [
+                status
+                for status in checkpoint_space_status
+                if int(status.get("required_free_bytes", 0)) > int(status.get("free_bytes", 0))
+            ]
+            if (
+                int(guard_cache_budget_summary.get("free_space_floor_bytes", 0)) > 0
+                and int(guard_cache_budget_summary.get("free_bytes_after", 0))
+                < int(guard_cache_budget_summary.get("free_space_floor_bytes", 0))
+            ) or insufficient_roots:
+                cache_budget_summary = guard_cache_budget_summary
+                cache_budget_summary["checkpoint_payload_space_status"] = checkpoint_space_status
+                termination_reason = "checkpoint_space_guard_stop"
+                break
+        cache_budget_summary = _enforce_cache_budget(
+            config,
+            checkpoint_payload_roots=checkpoint_payload_roots,
+        )
+        segment_started_at = time.monotonic()
         segment_plan = provider.build_segment_plan(
             segment_id=segment_id,
             optimizer_steps=model_config.segment_steps,
@@ -690,32 +1059,28 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
                 "resume_path_id": effective_resume_path,
             },
         }
-        last_estimated_checkpoint_payload_bytes = _estimate_checkpoint_payload_bytes(
+        last_estimated_checkpoint_component_bytes = _estimate_checkpoint_payload_component_bytes(
             params=params,
             opt_state=opt_state,
             rng_state=rng_state,
         )
+        last_estimated_checkpoint_payload_root_bytes = _checkpoint_payload_bytes_by_root(
+            payload_root_map=checkpoint_payload_root_map,
+            component_bytes=last_estimated_checkpoint_component_bytes,
+        )
+        last_estimated_checkpoint_payload_bytes = int(sum(last_estimated_checkpoint_component_bytes.values()))
         checkpoint_retention_summary = prune_checkpoint_payloads(
             checkpoint_dir=checkpoints_dir,
             keep_last=int(max(config.checkpoint_retention_limit, 0)),
             keep_segment_ids=_checkpoint_keep_segment_ids(last_applied_segment_id),
+            payload_roots=checkpoint_payload_root_map,
         )
-        cache_budget_summary = _enforce_cache_budget(
-            config,
-            reserve_bytes=last_estimated_checkpoint_payload_bytes,
+        cache_budget_summary = _require_checkpoint_commit_headroom(
+            config=config,
+            checkpoint_payload_roots=checkpoint_payload_roots,
+            checkpoint_payload_bytes_by_root=last_estimated_checkpoint_payload_root_bytes,
+            checkpoint_stage="next",
         )
-        required_free_bytes = int(cache_budget_summary.get("free_space_floor_bytes", 0))
-        free_bytes_after = int(cache_budget_summary.get("free_bytes_after", 0))
-        if required_free_bytes > 0 and free_bytes_after < required_free_bytes:
-            raise RuntimeError(
-                "Insufficient disk headroom to commit the next checkpoint payload: "
-                f"free_bytes_after={free_bytes_after}, "
-                f"required_free_bytes={required_free_bytes}, "
-                f"estimated_checkpoint_payload_bytes={last_estimated_checkpoint_payload_bytes}, "
-                f"checkpoint_retention_limit={int(config.checkpoint_retention_limit)}. "
-                "Either increase writable disk capacity, reduce checkpoint payload size, "
-                "or place checkpoints on a roomier volume."
-            )
         last_checkpoint_manifest_path = save_iris3b_checkpoint(
             checkpoint_dir=checkpoints_dir,
             segment_id=segment_id,
@@ -723,6 +1088,7 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
             opt_state=opt_state,
             rng_state=rng_state,
             manifest_payload=checkpoint_manifest,
+            payload_roots=checkpoint_payload_root_map,
         )
         last_checkpoint_payload_ref = str(Path("payloads") / f"segment_{segment_id:06d}")
         if _should_crash(config, "post_commit", segment_id):
@@ -784,11 +1150,16 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
             checkpoint_dir=checkpoints_dir,
             keep_last=int(max(config.checkpoint_retention_limit, 0)),
             keep_segment_ids=_checkpoint_keep_segment_ids(last_applied_segment_id),
+            payload_roots=checkpoint_payload_root_map,
         )
-        cache_budget_summary = _enforce_cache_budget(config)
+        cache_budget_summary = _enforce_cache_budget(
+            config,
+            checkpoint_payload_roots=checkpoint_payload_roots,
+        )
 
         if last_batch is None:
             raise RuntimeError("Training segment completed without a batch; this should be unreachable.")
+        segment_wall_time_seconds = float(max(time.monotonic() - segment_started_at, 0.0))
         last_state = last_batch.state_irs[-1]
         task_semantics = resolve_task_semantics(last_state.PF)
         metrics = build_canonical_metrics(
@@ -798,6 +1169,7 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
             task_confidence=task_confidence,
             extra={
                 "cost.total_steps": optimizer_step_id,
+                "cost.segment_wall_time_seconds": segment_wall_time_seconds,
                 "phase": config.phase,
                 "baseline_id": config.baseline_id,
                 "tolerance_profile_id": config.tolerance_profile_id,
@@ -885,7 +1257,11 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
         )
         append_jsonl(metrics_path, metrics)
         segments_completed += 1
-        cache_budget_summary = _enforce_cache_budget(config)
+        observed_segment_wall_times.append(segment_wall_time_seconds)
+        cache_budget_summary = _enforce_cache_budget(
+            config,
+            checkpoint_payload_roots=checkpoint_payload_roots,
+        )
 
     if last_checkpoint_manifest_path is None:
         raise RuntimeError("Training cycle completed without producing an APPLIED checkpoint.")
@@ -926,12 +1302,31 @@ def run_p1_training_cycle(config: P1TrainConfig) -> Dict[str, Any]:
         "checkpoint_manifest_path": str(last_checkpoint_manifest_path),
         "checkpoint_payload_ref": last_checkpoint_payload_ref,
         "segments_completed": int(segments_completed),
+        "termination_reason": termination_reason,
         "realized_tokens": int(realized_tokens),
         "dataset_cache_limit_gib": int(config.dataset_cache_limit_gib),
         "cache_free_space_floor_gib": int(config.cache_free_space_floor_gib),
         "checkpoint_retention_limit": int(config.checkpoint_retention_limit),
         "checkpoint_retention": dict(checkpoint_retention_summary),
+        "checkpoint_payload_root": (
+            str(legacy_checkpoint_payload_root) if legacy_checkpoint_payload_root is not None else ""
+        ),
+        "checkpoint_payload_roots": {
+            component: str(checkpoint_payload_root_map[component])
+            for component in _CHECKPOINT_PAYLOAD_COMPONENTS
+        },
         "estimated_checkpoint_payload_bytes": int(last_estimated_checkpoint_payload_bytes),
+        "estimated_checkpoint_payload_bytes_by_component": {
+            component: int(last_estimated_checkpoint_component_bytes.get(component, 0))
+            for component in _CHECKPOINT_PAYLOAD_COMPONENTS
+        },
+        "estimated_checkpoint_payload_bytes_by_root": {
+            str(root): int(bytes_reserved)
+            for root, bytes_reserved in last_estimated_checkpoint_payload_root_bytes.items()
+        },
+        "cycle_remaining_seconds": float(deadline - time.monotonic()),
+        "cycle_sync_reserve_minutes": float(config.cycle_sync_reserve_minutes),
+        "segment_guard_minutes": float(config.segment_guard_minutes),
         "dataset_cache_budget": cache_budget_summary,
     }
 
@@ -943,6 +1338,8 @@ def export_final_release(
     release_dir: Path,
     model_config: IRIS3BConfig,
     tokenizer_root: Path,
+    checkpoint_payload_root: Path | None = None,
+    checkpoint_payload_roots: Mapping[str, Path | str | None] | None = None,
     readiness_packet_path: Path | None = None,
     readiness_history_path: Path | None = None,
     streaming_manifest_path: Path | None = None,
@@ -957,7 +1354,14 @@ def export_final_release(
         if not applied_rows:
             raise RuntimeError("No APPLIED segment exists to export.")
         checkpoint_path = run_dir / str(applied_rows[-1]["checkpoint_ref"])
-    checkpoint = load_iris3b_checkpoint(checkpoint_path)
+    checkpoint = load_iris3b_checkpoint(
+        checkpoint_path,
+        payload_roots=(
+            dict(checkpoint_payload_roots)
+            if checkpoint_payload_roots is not None
+            else ((Path(checkpoint_payload_root),) if checkpoint_payload_root is not None else ())
+        ),
+    )
     if checkpoint.get("params") is None:
         raise RuntimeError("Final export requires an orbax-backed IRIS 3B checkpoint.")
 

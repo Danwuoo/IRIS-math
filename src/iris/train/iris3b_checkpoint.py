@@ -5,10 +5,11 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import Any, Dict, Mapping
+from typing import Any, Dict, Mapping, Sequence
 
 _SEGMENT_MANIFEST_RE = re.compile(r"^segment_(\d+)\.json$")
 _SEGMENT_PAYLOAD_RE = re.compile(r"^segment_(\d+)$")
+_PAYLOAD_COMPONENTS = ("params", "optimizer_state", "rng_state")
 
 
 def _require_checkpoint_stack() -> Any:
@@ -57,8 +58,86 @@ def checkpoint_manifest_path(checkpoint_dir: Path, segment_id: int) -> Path:
     return Path(checkpoint_dir) / f"segment_{int(segment_id):06d}.json"
 
 
-def checkpoint_payload_dir(checkpoint_dir: Path, segment_id: int) -> Path:
-    return Path(checkpoint_dir) / "payloads" / f"segment_{int(segment_id):06d}"
+def checkpoint_payload_dir(
+    checkpoint_dir: Path,
+    segment_id: int,
+    *,
+    payload_root: Path | None = None,
+) -> Path:
+    root = Path(payload_root) if payload_root is not None else (Path(checkpoint_dir) / "payloads")
+    return root / f"segment_{int(segment_id):06d}"
+
+
+def _component_payload_root_map(
+    checkpoint_dir: Path,
+    *,
+    payload_root: Path | None = None,
+    payload_roots: Mapping[str, Path | str | None] | None = None,
+) -> dict[str, Path]:
+    default_root = Path(payload_root) if payload_root is not None else (Path(checkpoint_dir) / "payloads")
+    root_map = {
+        component: default_root
+        for component in _PAYLOAD_COMPONENTS
+    }
+    for component, root in dict(payload_roots or {}).items():
+        if component not in root_map or root is None:
+            continue
+        root_map[component] = Path(root)
+    return root_map
+
+
+def _iter_payload_root_values(payload_roots: Any) -> list[Path]:
+    if payload_roots is None:
+        return []
+    if isinstance(payload_roots, Mapping):
+        values: list[Path] = []
+        for root in payload_roots.values():
+            if root is None:
+                continue
+            if isinstance(root, (list, tuple, set)):
+                values.extend(Path(candidate) for candidate in root if candidate is not None)
+                continue
+            values.append(Path(root))
+        return values
+    return [Path(root) for root in payload_roots if root is not None]
+
+
+def _component_search_roots(
+    checkpoint_dir: Path,
+    *,
+    payload_roots: Any = None,
+) -> dict[str, tuple[Path, ...]]:
+    default_root = Path(checkpoint_dir) / "payloads"
+    search_roots = {
+        component: [default_root]
+        for component in _PAYLOAD_COMPONENTS
+    }
+    if isinstance(payload_roots, Mapping):
+        for component in _PAYLOAD_COMPONENTS:
+            root = payload_roots.get(component)
+            if root is None:
+                continue
+            if isinstance(root, (list, tuple, set)):
+                search_roots[component].extend(Path(candidate) for candidate in root if candidate is not None)
+                continue
+            search_roots[component].append(Path(root))
+    else:
+        generic_roots = _iter_payload_root_values(payload_roots)
+        for component in _PAYLOAD_COMPONENTS:
+            search_roots[component].extend(generic_roots)
+
+    normalized: dict[str, tuple[Path, ...]] = {}
+    for component, roots in search_roots.items():
+        unique: list[Path] = []
+        seen: set[str] = set()
+        for root in roots:
+            key = str(Path(root).resolve(strict=False))
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(Path(root))
+        normalized[component] = tuple(unique)
+    return normalized
 
 
 def _segment_id_from_name(name: str, *, pattern: re.Pattern[str]) -> int | None:
@@ -123,11 +202,52 @@ def _resolve_ref(manifest_path: Path, ref: str) -> Path:
     return manifest_path.parent / candidate
 
 
+def _resolve_payload_ref(
+    manifest_path: Path,
+    ref: str,
+    *,
+    payload_roots: Sequence[Path] | None = None,
+) -> Path:
+    candidate = _resolve_ref(manifest_path, ref)
+    if candidate.exists():
+        return candidate
+    raw_ref = Path(str(ref))
+    if raw_ref.is_absolute():
+        return candidate
+    parts = raw_ref.parts
+    if not parts or parts[0] != "payloads":
+        return candidate
+    suffix = Path(*parts[1:]) if len(parts) > 1 else Path()
+    for root in payload_roots or ():
+        alternate = Path(root) / suffix
+        if alternate.exists():
+            return alternate
+    return candidate
+
+
+def _unique_payload_roots(
+    checkpoint_dir: Path,
+    payload_roots: Any = None,
+) -> tuple[Path, ...]:
+    roots: list[Path] = [Path(checkpoint_dir) / "payloads"]
+    roots.extend(_iter_payload_root_values(payload_roots))
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for root in roots:
+        key = str(root.resolve(strict=False))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(root)
+    return tuple(unique)
+
+
 def prune_checkpoint_payloads(
     *,
     checkpoint_dir: Path,
     keep_last: int = 1,
     keep_segment_ids: tuple[int, ...] = (),
+    payload_roots: Any = None,
 ) -> Dict[str, Any]:
     checkpoint_dir = Path(checkpoint_dir)
     retention_limit = int(max(keep_last, 0))
@@ -154,8 +274,9 @@ def prune_checkpoint_payloads(
     deleted_bytes = 0
     pruned_segment_ids: list[int] = []
     pruned_payload_paths: list[str] = []
-    payload_root = checkpoint_dir / "payloads"
-    if payload_root.exists():
+    for payload_root in _unique_payload_roots(checkpoint_dir, payload_roots):
+        if not payload_root.exists():
+            continue
         for child in sorted(payload_root.iterdir(), key=lambda item: item.name):
             segment_id = _segment_id_from_name(child.name, pattern=_SEGMENT_PAYLOAD_RE)
             if segment_id is None or segment_id in keep_ids:
@@ -175,7 +296,7 @@ def prune_checkpoint_payloads(
     return {
         "retention_limit": retention_limit,
         "kept_segment_ids": sorted(int(segment_id) for segment_id in keep_ids),
-        "pruned_segment_ids": sorted(pruned_segment_ids),
+        "pruned_segment_ids": sorted({int(segment_id) for segment_id in pruned_segment_ids}),
         "deleted_bytes": int(deleted_bytes),
         "pruned_payload_paths": pruned_payload_paths,
     }
@@ -189,13 +310,32 @@ def save_iris3b_checkpoint(
     opt_state: Any,
     rng_state: Mapping[str, Any],
     manifest_payload: Mapping[str, Any],
+    payload_root: Path | None = None,
+    payload_roots: Mapping[str, Path | str | None] | None = None,
 ) -> Path:
     checkpoint_dir = Path(checkpoint_dir)
     manifest_path = checkpoint_manifest_path(checkpoint_dir, segment_id)
-    payload_root = checkpoint_payload_dir(checkpoint_dir, segment_id)
-    params_path = payload_root / "params"
-    opt_state_path = payload_root / "optimizer_state"
-    rng_state_path = payload_root / "rng_state"
+    payload_dir = checkpoint_payload_dir(checkpoint_dir, segment_id, payload_root=payload_root)
+    payload_root_map = _component_payload_root_map(
+        checkpoint_dir,
+        payload_root=payload_root,
+        payload_roots=payload_roots,
+    )
+    params_path = checkpoint_payload_dir(
+        checkpoint_dir,
+        segment_id,
+        payload_root=payload_root_map["params"],
+    ) / "params"
+    opt_state_path = checkpoint_payload_dir(
+        checkpoint_dir,
+        segment_id,
+        payload_root=payload_root_map["optimizer_state"],
+    ) / "optimizer_state"
+    rng_state_path = checkpoint_payload_dir(
+        checkpoint_dir,
+        segment_id,
+        payload_root=payload_root_map["rng_state"],
+    ) / "rng_state"
     _save_pytree(params_path, params)
     _save_pytree(opt_state_path, opt_state)
     _save_pytree(rng_state_path, dict(rng_state))
@@ -204,19 +344,23 @@ def save_iris3b_checkpoint(
         {
             "schema": "iris.training_checkpoint/v2",
             "checkpoint_kind": "orbax_sidecar",
-            "checkpoint_payload_ref": str(Path("payloads") / payload_root.name),
+            "checkpoint_payload_ref": str(Path("payloads") / payload_dir.name),
             "payload_format": "orbax.pytree/v1",
             "payload_refs": {
-                "params": str(Path("payloads") / payload_root.name / "params"),
-                "optimizer_state": str(Path("payloads") / payload_root.name / "optimizer_state"),
-                "rng_state": str(Path("payloads") / payload_root.name / "rng_state"),
+                "params": str(Path("payloads") / payload_dir.name / "params"),
+                "optimizer_state": str(Path("payloads") / payload_dir.name / "optimizer_state"),
+                "rng_state": str(Path("payloads") / payload_dir.name / "rng_state"),
             },
         }
     )
     return _write_json_atomic(manifest_path, manifest)
 
 
-def load_iris3b_checkpoint(path: Path) -> Dict[str, Any]:
+def load_iris3b_checkpoint(
+    path: Path,
+    *,
+    payload_roots: Any = None,
+) -> Dict[str, Any]:
     manifest_path = Path(path)
     payload = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     if not isinstance(payload, dict):
@@ -228,9 +372,17 @@ def load_iris3b_checkpoint(path: Path) -> Dict[str, Any]:
     payload_refs = dict(payload.get("payload_refs", {}))
     if not payload_refs:
         raise RuntimeError(f"Checkpoint manifest is missing payload_refs: {manifest_path}")
+    component_search_roots = _component_search_roots(
+        manifest_path.parent,
+        payload_roots=payload_roots,
+    )
     resolved_refs = {
-        name: _resolve_ref(manifest_path, str(payload_refs.get(name, "")))
-        for name in ("params", "optimizer_state", "rng_state")
+        name: _resolve_payload_ref(
+            manifest_path,
+            str(payload_refs.get(name, "")),
+            payload_roots=component_search_roots.get(name, ()),
+        )
+        for name in _PAYLOAD_COMPONENTS
     }
     missing_refs = {name: str(candidate) for name, candidate in resolved_refs.items() if not candidate.exists()}
     if missing_refs:
