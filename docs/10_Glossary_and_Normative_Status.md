@@ -56,6 +56,14 @@ Use these labels consistently.
 | `docs/16_Optimization_and_Learning_Contract.md` | Active Companion Authority | Learning-objective families, curriculum activation, and level-addressable optimization contract |
 | `docs/17_Runtime_and_Task_Adjudication_Semantics.md` | Active Companion Authority | Runtime-cycle semantics, task-family adjudication, and terminal-status policy |
 
+### 2.4 Archived Legacy Material
+
+Archived legacy materials live under `docs/archive/`.
+
+- Legacy design notes that collide with active numbering have been moved out of the `docs/` root.
+- Pre-renumber companion-doc copies (`13` through `19`) are archive-only and do not define active authority.
+- When an archived document path and an active root-level path disagree, the active root-level path wins.
+
 ## 3. Transition Terms
 
 - **Documentation-First Transition:** the repository state where active v2 docs are authoritative even if `src/` still contains baseline-aligned code.
@@ -125,6 +133,6 @@ Use these labels consistently.
 1. Active v2 docs override baseline implementation behavior.
 2. There is no separate active strategy-note authority above the active contract set; directional interpretation must come from the active contracts and companion docs.
 3. Active companion docs elaborate scoped authority and are binding within that scope.
-4. Deleted archive docs do not define active authority; legacy `StateIR(T,G,O,R,X,M)` or ARC-specific semantics remain non-authoritative even when referenced historically.
+4. Archived docs under `docs/archive/` do not define active authority; legacy `StateIR(T,G,O,R,X,M)` or ARC-specific semantics remain non-authoritative even when referenced historically.
 5. Benchmark usage is governed by `docs/07_Data_Constitution.md` and `docs/13_Benchmark_Registry_and_Tiering_Playbook.md`, not by legacy blanket bans.
 6. `src/` may lag the docs during transition, but the lag must be explicit and temporary.

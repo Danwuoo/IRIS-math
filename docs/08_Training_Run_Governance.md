@@ -189,6 +189,18 @@ Commit protocol:
 - `code_version_hash`
 - `config_hash`
 
+### 6.2 External Checkpoint Export Surface
+
+When Hugging Face is used as the external checkpoint/export surface for governed P1 Kaggle operations, the export surface must be a Hugging Face Bucket URI, not a Hub repository path.
+
+Operational requirements:
+
+- checkpoint sync target must be an `hf://buckets/<namespace>/<bucket>` URI, optionally with a stable prefix,
+- the authoritative run tree must remain rooted at `checkpoints/{run_id}`,
+- the exported latest-pointer set must include both `latest/{run_id}.json` and `latest/latest.json`,
+- any externalized checkpoint payload roots must sync back under `checkpoints/{run_id}/checkpoints/payloads`,
+- final release export may target a separate bucket URI, but it must not change the authority rule that only a local `APPLIED` checkpoint plus journal reconciliation defines resume truth.
+
 ---
 
 ## 7. Behavior-Affecting RNG Governance
@@ -282,6 +294,17 @@ For streaming-backed runs, the journal, checkpoint, or equivalent committed run 
 - streaming mode effective,
 - local snapshot manifest ref when `local_snapshot` is used,
 - any canonicalization or packing manifest ref when raw document sources were normalized before streaming.
+
+### 8.3 Hugging Face Request Budgeting
+
+When Hugging Face is used as a governed training data or artifact surface, operational clients must share a UTC-aligned 5-minute request budget.
+
+Operational requirements:
+
+- Hub API calls must be budgeted against `100` requests per 5-minute UTC window,
+- resolver/download surfaces must be budgeted against `5000` requests per 5-minute UTC window,
+- budgeting state must be shared across cooperating local processes for the same runtime when checkpoint sync and dataset access can overlap,
+- request budgeting is an operational admission control and does not change checkpoint authority, resume truth, or benchmark/data-policy obligations.
 
 ---
 
